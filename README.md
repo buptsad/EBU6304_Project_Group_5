@@ -77,11 +77,3 @@ The Personal Finance Manager is an AI-powered application designed to help users
 3. Commit your changes (`git commit -m 'Add new feature'`).
 4. Push to the branch (`git push origin feature/new-feature`).
 5. Open a pull request.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-For questions or feedback, contact the maintainers at [your.email@example.com](mailto:your.email@example.com).
