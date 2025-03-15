@@ -60,7 +60,7 @@ The Personal Finance Manager is an AI-powered application designed to help users
 
 1. Download the latest release from the https://github.com/buptsad/EBU6304_Project_Group_5
 2. Extract the ZIP file to your preferred location.
-3. Run the JAR file to launch the application.
+3. Run the JAR file to launch the application...
 
 ### Usage
 
