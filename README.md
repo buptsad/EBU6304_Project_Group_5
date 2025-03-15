@@ -58,7 +58,7 @@ The Personal Finance Manager is an AI-powered application designed to help users
 
 ### Installation
 
-1. Download the latest release from the [releases page](https://github.com/yourusername/personal-finance-manager/releases).
+1. Download the latest release from the https://github.com/buptsad/EBU6304_Project_Group_5
 2. Extract the ZIP file to your preferred location.
 3. Run the JAR file to launch the application.
 
@@ -69,11 +69,3 @@ The Personal Finance Manager is an AI-powered application designed to help users
 - Explore the dashboard for financial insights.
 - Set budgets and receive alerts when needed.
 - Use AI features for smart financial planning.
-
-## Contribution Guidelines
-
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/new-feature`).
-3. Commit your changes (`git commit -m 'Add new feature'`).
-4. Push to the branch (`git push origin feature/new-feature`).
-5. Open a pull request.
