@@ -44,7 +44,7 @@ The Personal Finance Manager is an AI-powered application designed to help users
 
 ### Settings & Support
 
-- **Customization**: Adjust language, theme, and backup settings.
+- **Customization**: Adjust language, theme, and backup settings. 
 - **Help Center**: Access documentation and customer support for assistance.
 
 ## Tech Stack
