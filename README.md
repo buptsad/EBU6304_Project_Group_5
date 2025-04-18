@@ -143,3 +143,11 @@ This project is an AI-Empowered Personal Finance Tracker developed as part of th
 - Expand financial analysis capabilities
 - Develop mobile companion application
 - Enhance data security and encryption
+
+## Development Guide
+
+1. Install gradle.
+2. Clone this repo.
+3. Run `gradle wrapper` in the root of the project.
+4. Run `./gradle build` to build this project. For windows, it is `.\gradle.bat build`
+5. Run `./gradle run` to run this project. For windows, it is `.\gradle.bat run`
