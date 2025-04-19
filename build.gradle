@@ -24,6 +24,8 @@ dependencies {
     implementation 'cn.hutool:hutool-all:5.8.16'
 
     implementation 'org.json:json:20250107'
+
+    implementation 'org.json:json:20250107'
     
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
 
