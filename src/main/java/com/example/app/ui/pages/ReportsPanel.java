@@ -2,12 +2,16 @@ package com.example.app.ui.pages;
 
 import com.example.app.model.FinanceData;
 import com.example.app.ui.reports.*;
+import com.example.app.model.CSVDataImporter;
+import com.example.app.model.DataRefreshListener;
+import com.example.app.model.DataRefreshManager;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.List;
 
-public class ReportsPanel extends JPanel {
+public class ReportsPanel extends JPanel implements DataRefreshListener {
     
     private final FinanceData financeData = new FinanceData();
     private JPanel chartContainer;
@@ -23,7 +27,12 @@ public class ReportsPanel extends JPanel {
     private static final String CATEGORY_BREAKDOWN_PANEL = "CATEGORY_BREAKDOWN";
     private static final String TREND_PANEL = "TREND";
     
-    public ReportsPanel() {
+    private String username;
+    public ReportsPanel(String username) {
+        this.username = username;
+        // 导入交易数据
+        loadTransactionData();
+        
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
@@ -57,8 +66,11 @@ public class ReportsPanel extends JPanel {
         scrollPane.setBorder(null);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(scrollPane, BorderLayout.CENTER);
+        
+        // Register as listener for data refresh events
+        DataRefreshManager.getInstance().addListener(this);
     }
-    
+
     private JPanel createHeaderPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         JLabel titleLabel = new JLabel("Financial Reports");
@@ -118,6 +130,12 @@ public class ReportsPanel extends JPanel {
         applyButton.setMaximumSize(new Dimension(220, 35));
         panel.add(applyButton);
         
+        // 添加加载数据按钮
+        JButton loadDataButton = new JButton("加载交易数据");
+        loadDataButton.setAlignmentX(LEFT_ALIGNMENT);
+        loadDataButton.setMaximumSize(new Dimension(220, 35));
+        panel.add(loadDataButton);
+        
         // Add action listeners
         timePeriodsCombo.addActionListener(e -> {
             updateReportTimeRange(timePeriodsCombo.getSelectedItem().toString());
@@ -150,6 +168,15 @@ public class ReportsPanel extends JPanel {
                 timePeriodsCombo.getSelectedItem().toString(),
                 intervalsCombo.getSelectedItem().toString()
             );
+        });
+        
+        loadDataButton.addActionListener(e -> {
+            loadTransactionData();
+            // 刷新所有图表
+            incomeExpensesPanel.refreshChart();
+            categoryBreakdownPanel.refreshChart();
+            trendReportPanel.refreshChart();
+            JOptionPane.showMessageDialog(this, "交易数据已成功加载", "加载成功", JOptionPane.INFORMATION_MESSAGE);
         });
         
         return panel;
@@ -188,5 +215,40 @@ public class ReportsPanel extends JPanel {
         incomeExpensesPanel.refreshChart();
         categoryBreakdownPanel.refreshChart();
         trendReportPanel.refreshChart();
+    }
+    
+    private void loadTransactionData() {
+        // 读取CSV文件数据 - 使用用户特定的路径
+        String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
+        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
+        
+        // 将数据导入到FinanceData模型中
+        if (!transactions.isEmpty()) {
+            financeData.importTransactions(transactions);
+            System.out.println("成功导入 " + transactions.size() + " 条交易记录");
+        } else {
+            System.err.println("没有交易记录被导入");
+        }
+    }
+    
+    @Override
+    public void onDataRefresh(DataRefreshManager.RefreshType type) {
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            type == DataRefreshManager.RefreshType.ALL) {
+            // Reload transaction data
+            loadTransactionData();
+            
+            // Refresh all charts
+            incomeExpensesPanel.refreshChart();
+            categoryBreakdownPanel.refreshChart();
+            trendReportPanel.refreshChart();
+        }
+    }
+    
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        // Unregister when component is removed from UI
+        DataRefreshManager.getInstance().removeListener(this);
     }
 }
