@@ -5,22 +5,43 @@ import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
 import com.example.app.ui.dashboard.BudgetCategoryPanel;
 import com.example.app.ui.dashboard.BudgetDialog;
+import com.example.app.ui.pages.AI.getRes;
+import com.example.app.model.CSVDataImporter;
+import com.example.app.model.DataRefreshListener;
+import com.example.app.model.DataRefreshManager;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
+
+import org.json.JSONObject;
+
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.io.IOException;
 import java.util.*;
 import java.util.List;
 
-public class BudgetsPanel extends JPanel implements CurrencyChangeListener {
+public class BudgetsPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
     private final FinanceData financeData;
     private final JPanel userBudgetsPanel;
     private final JPanel aiSuggestedPanel;
     private Random random = new Random();
+    private String username;
 
-    public BudgetsPanel() {
+    public BudgetsPanel(String username) {
+        this.username = username;
         this.financeData = new FinanceData();
+        
+        // 设置数据目录并加载预算
+        String dataDirectory = ".\\user_data\\" + username;
+        financeData.setDataDirectory(dataDirectory);
+        
+        // 先加载事务数据
+        loadTransactionData();
+        
+        // 再加载预算数据
+        financeData.loadBudgets();
+        
         setLayout(new BorderLayout(20, 0));
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
@@ -114,6 +135,8 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener {
         // 注册货币变化监听器
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
         
+        // Register as listener for data refresh events
+        DataRefreshManager.getInstance().addListener(this);
     }
 
     private void updateUserCategoryPanels() {
@@ -247,30 +270,79 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener {
     
     private Map<String, Double> generateSuggestedBudgets(Map<String, Double> currentBudgets, double totalBudget) {
         Map<String, Double> suggestedBudgets = new LinkedHashMap<>();
-        List<String> categories = new ArrayList<>(currentBudgets.keySet());
-        
-        // First pass: assign random percentages that sum to 100%
-        double[] percentages = new double[categories.size()];
-        double sum = 0;
-        
-        for (int i = 0; i < percentages.length; i++) {
-            // Generate random percentage between 5-25
-            percentages[i] = 5 + random.nextDouble() * 20;
-            sum += percentages[i];
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Double> e : currentBudgets.entrySet()) {
+            sb.append(e.getKey())
+            .append(": ")
+            .append(e.getValue())
+            .append("; ");
         }
-        
-        // Normalize percentages to sum to 100%
-        for (int i = 0; i < percentages.length; i++) {
-            percentages[i] = percentages[i] / sum * 100;
+        if (sb.length() >= 2) {
+            sb.setLength(sb.length() - 2);  // 去掉末尾的 "; "
         }
-        
-        // Convert percentages to budget amounts
-        for (int i = 0; i < categories.size(); i++) {
-            String category = categories.get(i);
-            double amount = totalBudget * percentages[i] / 100;
-            suggestedBudgets.put(category, Math.round(amount * 100) / 100.0); // Round to 2 decimals
+        String budgetString = sb.toString();
+        System.out.println(budgetString);
+        String aiPrompt = String.format(
+            "当前预算分配如下：%s。总预算为 %.2f。"
+        + " 请在总金额不变的情况下，将总预算在各类中重新分配，给出一个更合理的预算分配方案。"
+        + " 请以 JSON 格式输出，键是类别名称，值是对应金额，此外不要输出其它任何内容。",
+            budgetString,
+            totalBudget
+        );
+
+        String API_KEY;
+        String response;
+        try {
+        API_KEY = "sk-fdf26a37926f46ab8d4884c2cd533db8";
+        response = new getRes().getResponse(API_KEY, aiPrompt);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-        
+        String res = null;
+        try {
+            res = new getRes().parseAIResponse(response);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println(res);
+        // 1. trim 空白
+        res = res.trim();
+
+        // 2. 去掉开头的 ``` 及可选语言标识
+        if (res.startsWith("```")) {
+            int firstNewline = res.indexOf('\n');
+            if (firstNewline != -1) {
+                res = res.substring(firstNewline + 1).trim();
+            } else {
+                // 整个字符串只有 ```？ 那就清空
+                res = "";
+            }
+        }
+        // 3. 去掉结尾的 ```
+        if (res.endsWith("```")) {
+            int lastBackticks = res.lastIndexOf("```");
+            res = res.substring(0, lastBackticks).trim();
+        }
+
+        // 4. 若还有 "json" 前缀，一并去掉
+        if (res.startsWith("json")) {
+            int brace = res.indexOf('{');
+            if (brace != -1) {
+                res = res.substring(brace).trim();
+            }
+        }
+        // 5. 再用 org.json 解析
+        try {
+            JSONObject json = new JSONObject(res);
+            for (String category : currentBudgets.keySet()) {
+                double val = json.has(category)
+                        ? json.getDouble(category)
+                        : currentBudgets.get(category);
+                suggestedBudgets.put(category, val);
+            }
+        } catch (Exception e) {
+            System.err.println("解析 AI JSON 失败: " + e.getMessage());
+        }
         return suggestedBudgets;
     }
     
@@ -298,17 +370,17 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener {
         if (dialog.showDialog()) {
             String category = dialog.getCategory();
             double budget = dialog.getBudget();
-            // In a real app, you would add the category to the data model
-            JOptionPane.showMessageDialog(this, 
-                    "Adding new category: " + category + " with budget: "+currencySymbol + budget,
-                    "Category Added", 
-                    JOptionPane.INFORMATION_MESSAGE);
             
-            // For demo purposes, let's pretend we updated the model and refresh UI
-            JOptionPane.showMessageDialog(this,
-                    "In a real application, this would update the database.\n" +
-                    "For this demo, the UI will not reflect the change.",
-                    "Demo Information",
+            // 更新模型并保存到文件
+            financeData.updateCategoryBudget(category, budget);
+            
+            // 刷新UI
+            updateUserCategoryPanels();
+            updateAISuggestedPanels();
+            
+            JOptionPane.showMessageDialog(this, 
+                    "已添加新类别: " + category + " 预算为: " + currencySymbol + budget,
+                    "类别已添加", 
                     JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -325,10 +397,17 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener {
         
         if (dialog.showDialog()) {
             double newBudget = dialog.getBudget();
-            // In a real app, you would update the data model
+            
+            // 更新模型并保存到文件
+            financeData.updateCategoryBudget(category, newBudget);
+            
+            // 刷新UI
+            updateUserCategoryPanels();
+            updateAISuggestedPanels();
+            
             JOptionPane.showMessageDialog(this, 
-                    "Updating category: " + category + " with new budget: "+currencySymbol + newBudget,
-                    "Category Updated", 
+                    "已更新类别: " + category + " 的预算为: " + currencySymbol + newBudget,
+                    "类别已更新", 
                     JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -336,18 +415,24 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener {
     private void deleteCategory(String category) {
         int result = JOptionPane.showConfirmDialog(
                 this,
-                "Are you sure you want to delete the category: " + category + "?",
-                "Confirm Deletion",
+                "确定要删除类别: " + category + " 吗?",
+                "确认删除",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE
         );
         
         if (result == JOptionPane.YES_OPTION) {
-            // In a real app, you would delete from the data model
-            JOptionPane.showMessageDialog(this, 
-                    "Category deleted: " + category,
-                    "Category Deleted", 
-                    JOptionPane.INFORMATION_MESSAGE);
+            // 从模型中删除并保存到文件
+            if (financeData.deleteCategoryBudget(category)) {
+                // 刷新UI
+                updateUserCategoryPanels();
+                updateAISuggestedPanels();
+                
+                JOptionPane.showMessageDialog(this, 
+                        "类别已删除: " + category,
+                        "类别已删除", 
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
         }
     }
     
@@ -362,22 +447,44 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener {
     private void applyAISuggestions() {
         int result = JOptionPane.showConfirmDialog(
                 this,
-                "Do you want to apply the AI suggested budget allocations to your budget?",
-                "Apply AI Suggestions",
+                "确定要应用AI建议的预算分配到你的预算中吗?",
+                "应用AI建议",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE
         );
         
         if (result == JOptionPane.YES_OPTION) {
-            // In a real app, you would update the data model with the AI suggestions
-            JOptionPane.showMessageDialog(this,
-                    "AI suggested budgets have been applied to your budget allocations!",
-                    "Suggestions Applied",
-                    JOptionPane.INFORMATION_MESSAGE);
+            // 获取AI建议的预算
+            Map<String, Double> actualBudgets = financeData.getCategoryBudgets();
+            double totalBudget = actualBudgets.values().stream().mapToDouble(Double::doubleValue).sum();
+            Map<String, Double> suggestedBudgets = generateSuggestedBudgets(actualBudgets, totalBudget);
             
-            // For demo purposes, let's pretend we updated and refresh the UI
-            shuffleAISuggestions();  // This gives the appearance of change for the demo
+            // 更新每个类别的预算
+            for (Map.Entry<String, Double> entry : suggestedBudgets.entrySet()) {
+                financeData.updateCategoryBudget(entry.getKey(), entry.getValue());
+            }
+            
+            // 刷新UI
             updateUserCategoryPanels();
+            updateAISuggestedPanels();
+            
+            JOptionPane.showMessageDialog(this,
+                    "AI建议的预算已应用到你的预算分配中!",
+                    "已应用建议",
+                    JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
+    private void loadTransactionData() {
+        // 使用用户特定的路径
+        String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
+        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
+
+        if (!transactions.isEmpty()) {
+            financeData.importTransactions(transactions);
+            System.out.println("成功导入 " + transactions.size() + " 条交易记录");
+        } else {
+            System.err.println("没有交易记录被导入");
         }
     }
 
@@ -387,11 +494,31 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener {
         updateUserCategoryPanels();
         updateAISuggestedPanels();
     }
-    
+
+    @Override
+    public void onDataRefresh(DataRefreshManager.RefreshType type) {
+        if (type == DataRefreshManager.RefreshType.BUDGETS || 
+            type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            type == DataRefreshManager.RefreshType.ALL) {
+            
+            // Reload data if needed
+            if (type == DataRefreshManager.RefreshType.TRANSACTIONS) {
+                loadTransactionData();
+            }
+            
+            // Refresh UI components
+            updateUserCategoryPanels();
+            updateAISuggestedPanels();
+        }
+    }
+
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // 移除组件时取消监听
+        // Unregister when component is removed from UI
+        DataRefreshManager.getInstance().removeListener(this);
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
     }
 }
+
+
