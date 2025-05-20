@@ -541,8 +541,8 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
             
             // Show confirmation message
             JOptionPane.showMessageDialog(this, 
-                    "已添加新类别: " + category + " 预算为: " + currencySymbol + budget,
-                    "类别已添加", 
+                    "New category added: " + category + " Budget: " + currencySymbol + budget,
+                    "Category Added", 
                     JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -578,8 +578,8 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
             
             // Show confirmation message
             JOptionPane.showMessageDialog(this, 
-                    "已更新类别: " + category + " 的预算为: " + currencySymbol + newBudget,
-                    "类别已更新", 
+                    "Category updated: " + category + " New budget: " + currencySymbol + newBudget,
+                    "Category Updated", 
                     JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -592,8 +592,8 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
         // Show confirmation dialog
         int result = JOptionPane.showConfirmDialog(
                 this,
-                "确定要删除类别: " + category + " 吗?",
-                "确认删除",
+                "Are you sure you want to delete category: " + category + "?",
+                "Confirm Deletion",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE
         );
@@ -609,8 +609,8 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
                 
                 // Show confirmation message
                 JOptionPane.showMessageDialog(this, 
-                        "类别已删除: " + category,
-                        "类别已删除", 
+                        "Category deleted: " + category,
+                        "Category Deleted", 
                         JOptionPane.INFORMATION_MESSAGE);
             }
         }
@@ -637,8 +637,8 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
         // Show confirmation dialog
         int result = JOptionPane.showConfirmDialog(
                 this,
-                "确定要应用AI建议的预算分配到你的预算中吗?",
-                "应用AI建议",
+                "Are you sure you want to apply the AI-suggested budget allocation to your budget?",
+                "Apply AI Suggestions",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE
         );
@@ -662,8 +662,8 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
             
             // Show confirmation message
             JOptionPane.showMessageDialog(this,
-                    "AI建议的预算已应用到你的预算分配中!",
-                    "已应用建议",
+                    "AI-suggested budget has been applied to your budget allocation!",
+                    "Suggestions Applied",
                     JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -681,9 +681,9 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
         if (!transactions.isEmpty()) {
             // Update finance data with imported transactions
             financeData.importTransactions(transactions);
-            System.out.println("成功导入 " + transactions.size() + " 条交易记录");
+            System.out.println("Successfully imported " + transactions.size() + " transactions");
         } else {
-            System.err.println("没有交易记录被导入");
+            System.err.println("No transactions were imported");
         }
     }
 
