@@ -1,21 +1,46 @@
 package com.example.app.ui.dashboard;
 
+import com.example.app.model.CSVDataImporter;
 import com.example.app.model.FinanceData;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
+import com.example.app.model.DataRefreshListener;
+import com.example.app.model.DataRefreshManager;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public class DashboardBudgetsPanel extends JPanel implements CurrencyManager.CurrencyChangeListener {
-    private final FinanceData financeData;
-    private final JPanel categoriesPanel;
-
-    String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
+public class DashboardBudgetsPanel extends JPanel implements CurrencyManager.CurrencyChangeListener, DataRefreshListener {
+    private static final Logger LOGGER = Logger.getLogger(DashboardBudgetsPanel.class.getName());
     
-    public DashboardBudgetsPanel() {
-        this.financeData = new FinanceData();
+    private FinanceData financeData;
+    private final JPanel categoriesPanel;
+    private String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
+    private String username; // 存储当前用户名
+    private String userDataPath; // 存储用户特定的数据路径
+    
+    public DashboardBudgetsPanel(String username) {
+        this.username = username;
+        this.userDataPath = ".\\user_data\\" + username; // 设置用户特定的数据路径
+        
+        // 初始化财务数据
+        financeData = new FinanceData();
+        
+        // 设置用户特定的数据目录
+        financeData.setDataDirectory(userDataPath);
+        
+        LOGGER.log(Level.INFO, "正在为用户 {0} 加载预算数据，路径: {1}", new Object[]{username, userDataPath});
+        
+        // 先加载交易数据
+        loadTransactionData();
+        
+        // 再加载预算数据
+        financeData.loadBudgets();
+        
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
@@ -52,14 +77,40 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyManager.Cur
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(scrollPane, BorderLayout.CENTER);
         
-        // Add button panel
-        JPanel addButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton addButton = new JButton("Add Category");
-        addButton.setFont(new Font(addButton.getFont().getName(), Font.BOLD, 14));
-        addButton.setIcon(UIManager.getIcon("Tree.addIcon"));
-        addButton.addActionListener(e -> addNewCategory());
-        addButtonPanel.add(addButton);
-        add(addButtonPanel, BorderLayout.SOUTH);
+        // 注册货币变化监听器
+        CurrencyManager.getInstance().addCurrencyChangeListener(this);
+        
+        // Register as listener for data refresh events
+        DataRefreshManager.getInstance().addListener(this);
+    }
+    
+    /**
+     * 从用户特定的CSV文件加载交易数据
+     */
+    private void loadTransactionData() {
+        String csvFilePath = userDataPath + "\\user_bill.csv";
+        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
+        
+        if (!transactions.isEmpty()) {
+            financeData.importTransactions(transactions);
+            LOGGER.log(Level.INFO, "用户 {0}: 成功导入 {1} 条交易记录", new Object[]{username, transactions.size()});
+        } else {
+            LOGGER.log(Level.WARNING, "用户 {0}: 没有交易记录被导入", username);
+        }
+    }
+    
+    /**
+     * 打开完整预算面板
+     */
+    private void openFullBudgetPanel() {
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window instanceof JFrame) {
+            JFrame frame = (JFrame) window;
+            // 这里可以添加导航到完整BudgetsPanel的代码
+            JOptionPane.showMessageDialog(frame, 
+                "查看完整预算管理", 
+                "导航", JOptionPane.INFORMATION_MESSAGE);
+        }
     }
     
     private void updateCategoryPanels() {
@@ -109,11 +160,16 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyManager.Cur
         if (dialog.showDialog()) {
             String category = dialog.getCategory();
             double budget = dialog.getBudget();
-            // In a real app, you would add the category to the data model
-            // For demo purposes, we're just showing the dialog
+            
+            // 更新财务数据并保存到CSV文件
+            financeData.updateCategoryBudget(category, budget);
+            
+            // 更新UI
+            updateCategoryPanels();
+            
             JOptionPane.showMessageDialog(this, 
-                    "Adding new category: " + category + " with budget: " +currencySymbol + budget,
-                    "Category Added", 
+                    "新类别已添加: " + category + " 预算: " + currencySymbol + budget,
+                    "类别已添加", 
                     JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -128,11 +184,16 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyManager.Cur
         
         if (dialog.showDialog()) {
             double newBudget = dialog.getBudget();
-            // In a real app, you would update the data model
-            // For demo purposes, we're just showing the dialog
+            
+            // 更新财务数据并保存到CSV文件
+            financeData.updateCategoryBudget(category, newBudget);
+            
+            // 更新UI
+            updateCategoryPanels();
+            
             JOptionPane.showMessageDialog(this, 
-                    "Updating category: " + category + " with new budget: "+currencySymbol + newBudget,
-                    "Category Updated", 
+                    "类别已更新: " + category + " 新预算: " + currencySymbol + newBudget,
+                    "类别已更新", 
                     JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -140,18 +201,23 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyManager.Cur
     private void deleteCategory(String category) {
         int result = JOptionPane.showConfirmDialog(
                 this,
-                "Are you sure you want to delete the category: " + category + "?",
-                "Confirm Deletion",
+                "确定要删除类别: " + category + " 吗?",
+                "确认删除",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE
         );
         
         if (result == JOptionPane.YES_OPTION) {
-            // In a real app, you would delete from the data model
-            JOptionPane.showMessageDialog(this, 
-                    "Category deleted: " + category,
-                    "Category Deleted", 
-                    JOptionPane.INFORMATION_MESSAGE);
+            // 从财务数据中删除类别并保存到CSV文件
+            if (financeData.deleteCategoryBudget(category)) {
+                // 更新UI
+                updateCategoryPanels();
+                
+                JOptionPane.showMessageDialog(this, 
+                        "类别已删除: " + category,
+                        "类别已删除", 
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
         }
     }
 
@@ -165,9 +231,43 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyManager.Cur
     }
     
     @Override
+    public void onDataRefresh(DataRefreshManager.RefreshType type) {
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            type == DataRefreshManager.RefreshType.BUDGETS || 
+            type == DataRefreshManager.RefreshType.ALL) {
+            
+            // Reload data if needed
+            if (type == DataRefreshManager.RefreshType.TRANSACTIONS) {
+                loadTransactionData();
+            }
+            else if (type == DataRefreshManager.RefreshType.BUDGETS) {
+                financeData.loadBudgets();
+            }
+            
+            // Update the UI
+            updateCategoryPanels();
+        }
+    }
+    
+    @Override
     public void removeNotify() {
         super.removeNotify();
-        // 移除组件时取消监听
+        // Unregister from all listeners
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
+        DataRefreshManager.getInstance().removeListener(this);
+    }
+    
+    // 提供一个公共方法来更新用户名和对应的数据路径
+    public void setUsername(String username) {
+        this.username = username;
+        this.userDataPath = ".\\user_data\\" + username;
+        
+        // 更新数据路径并重新加载数据
+        financeData.setDataDirectory(userDataPath);
+        loadTransactionData();
+        financeData.loadBudgets();
+        
+        // 更新UI
+        updateCategoryPanels();
     }
 }
