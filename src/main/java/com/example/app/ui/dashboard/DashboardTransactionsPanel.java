@@ -1,8 +1,11 @@
 package com.example.app.ui.dashboard;
 
 import com.example.app.model.FinanceData;
+import com.example.app.model.CSVDataImporter;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
+import com.example.app.model.DataRefreshListener;
+import com.example.app.model.DataRefreshManager;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -13,13 +16,21 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 
-public class DashboardTransactionsPanel extends JPanel implements CurrencyChangeListener {
+public class DashboardTransactionsPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
     private JTable transactionsTable;
     private FinanceData financeData;
     private DefaultTableModel tableModel;
+    private static final int MAX_TRANSACTIONS = 20; // 显示的最大交易数量
+
+    private String username;
     
-    public DashboardTransactionsPanel() {
+    public DashboardTransactionsPanel(String username) {
+        this.username = username;
         financeData = new FinanceData();
+        
+        // 先从CSV文件加载数据
+        loadTransactionData();
+        
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
         
@@ -35,11 +46,50 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         // Add button panel at the bottom
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton viewAllButton = new JButton("View All Transactions");
+        viewAllButton.addActionListener(e -> openTransactionsPanel());
         buttonPanel.add(viewAllButton);
         add(buttonPanel, BorderLayout.SOUTH);
         
         // 注册货币变化监听器
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
+        
+        // Register as listener for data refresh events
+        DataRefreshManager.getInstance().addListener(this);
+    }
+    
+    /**
+     * 从CSV文件加载交易数据
+     */
+    private void loadTransactionData() {
+        // 使用用户特定的路径
+        String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
+        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
+        
+        if (!transactions.isEmpty()) {
+            financeData.importTransactions(transactions);
+            System.out.println("DashboardTransactionsPanel: 成功导入 " + transactions.size() + " 条交易记录");
+        } else {
+            System.err.println("DashboardTransactionsPanel: 没有交易记录被导入");
+        }
+    }
+    
+    /**
+     * 打开完整交易面板
+     */
+    private void openTransactionsPanel() {
+        // 获取主窗口的引用
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window instanceof JFrame) {
+            JFrame frame = (JFrame) window;
+            
+            // 这里可以添加导航到TransactionsPanel的代码
+            // 例如，如果有一个主TabPanel，可以切换到Transactions选项卡
+            // mainTabPanel.setSelectedIndex(transactionsTabIndex);
+            
+            JOptionPane.showMessageDialog(frame, 
+                "查看所有交易记录", 
+                "导航", JOptionPane.INFORMATION_MESSAGE);
+        }
     }
     
     private void createTransactionsTable() {
@@ -76,35 +126,7 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         transactionsTable.getColumnModel().getColumn(2).setPreferredWidth(120); // Category
         transactionsTable.getColumnModel().getColumn(3).setPreferredWidth(100); // Amount
         
-        // Create a custom renderer to color amounts (red for negative, green for positive)
-        DefaultTableCellRenderer amountRenderer = new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, 
-                    boolean isSelected, boolean hasFocus, int row, int column) {
-                
-                Component comp = super.getTableCellRendererComponent(
-                        table, value, isSelected, hasFocus, row, column);
-                
-                if (value instanceof Double) {
-                    double amount = (Double) value;
-                    if (amount < 0) {
-                        comp.setForeground(new Color(220, 50, 50)); // Red for expenses
-                    } else {
-                        comp.setForeground(new Color(50, 150, 50)); // Green for income
-                    }
-                    
-                    // Format with currency symbol and align right
-                    setHorizontalAlignment(SwingConstants.RIGHT);
-                    String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
-                    setText(String.format("%s%.2f",currencySymbol, amount));
-                }
-                
-                return comp;
-            }
-        };
-        
-        // Apply renderer to amount column
-        transactionsTable.getColumnModel().getColumn(3).setCellRenderer(amountRenderer);
+        // 应用金额列格式化渲染器
         updateAmountRenderer();
     }
 
@@ -146,48 +168,31 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
     
     private void populateTableWithRecentTransactions(DefaultTableModel model) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        Map<LocalDate, Double> expenses = financeData.getDailyExpenses();
-        Map<LocalDate, Double> incomes = financeData.getDailyIncomes();
         
-        // Create a combined list of all transaction data
-        List<TransactionEntry> allTransactions = new ArrayList<>();
+        // 获取所有交易记录
+        List<FinanceData.Transaction> allTransactions = financeData.getTransactions();
         
-        // Get all dates
-        List<LocalDate> dates = financeData.getDates();
+        // 创建一个可以排序的交易记录列表
+        List<TransactionEntry> transactionEntries = new ArrayList<>();
         
-        // Process each date
-        for (LocalDate date : dates) {
-            Double expense = expenses.get(date);
-            Double income = incomes.get(date);
-            
-            // Add expense transaction
-            if (expense != null && expense > 0) {
-                String category = financeData.getExpenseCategory(date);
-                String description = financeData.getExpenseDescription(date);
-                
-                allTransactions.add(new TransactionEntry(
-                    date, description, category, -expense
-                ));
-            }
-            
-            // Add income transaction
-            if (income != null && income > 0) {
-                String description = financeData.getIncomeDescription(date);
-                
-                allTransactions.add(new TransactionEntry(
-                    date, description, "Income", income
-                ));
-            }
+        // 将 FinanceData.Transaction 对象转换为 TransactionEntry 对象
+        for (FinanceData.Transaction transaction : allTransactions) {
+            transactionEntries.add(new TransactionEntry(
+                transaction.getDate(),
+                transaction.getDescription(),
+                transaction.getCategory(),
+                transaction.getAmount()
+            ));
         }
         
-        // Sort transactions by date (newest first)
-        allTransactions.sort(Comparator.comparing(TransactionEntry::getDate).reversed());
+        // 按日期倒序排序（最新的在前）
+        transactionEntries.sort(Comparator.comparing(TransactionEntry::getDate).reversed());
         
-        // Take only the most recent transactions (maximum 7)
-        List<TransactionEntry> recentTransactions = allTransactions.subList(
-                0, Math.min(7, allTransactions.size()));
+        // 只保留前MAX_TRANSACTIONS个记录
+        int displayCount = Math.min(MAX_TRANSACTIONS, transactionEntries.size());
+        List<TransactionEntry> recentTransactions = transactionEntries.subList(0, displayCount);
         
-        // Add the transactions to the model
+        // 添加交易记录到表格模型
         for (TransactionEntry entry : recentTransactions) {
             model.addRow(new Object[] {
                 entry.getDate().format(formatter),
@@ -196,11 +201,6 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
                 entry.getAmount()
             });
         }
-    }
-    
-    private String getRandomCategory(Set<String> categories, Random random) {
-        List<String> categoryList = new ArrayList<>(categories);
-        return categoryList.get(random.nextInt(categoryList.size()));
     }
     
     // Helper class to store and sort transaction data
@@ -231,9 +231,30 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
     }
     
     @Override
+    public void onDataRefresh(DataRefreshManager.RefreshType type) {
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            type == DataRefreshManager.RefreshType.ALL) {
+            // Reload data
+            loadTransactionData();
+            
+            // Refresh table
+            tableModel.setRowCount(0);
+            populateTableWithRecentTransactions(tableModel);
+            
+            // Update currency formatting
+            updateAmountRenderer();
+            
+            // Refresh UI
+            transactionsTable.revalidate();
+            transactionsTable.repaint();
+        }
+    }
+    
+    @Override
     public void removeNotify() {
         super.removeNotify();
-        // 移除组件时取消监听
+        // Unregister from all listeners
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
+        DataRefreshManager.getInstance().removeListener(this);
     }
 }
