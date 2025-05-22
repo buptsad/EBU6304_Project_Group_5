@@ -4,6 +4,8 @@ import com.example.app.model.FinanceData;
 import com.example.app.model.FinancialAdvice;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
+import com.example.app.model.DataRefreshListener;
+import com.example.app.model.DataRefreshManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -11,7 +13,7 @@ import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.util.Map;
 
-public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListener {
+public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
     private FinanceData financeData;
     private FinancialAdvice financialAdvice;
     private JPanel summaryPanel;
@@ -46,6 +48,9 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         
         // 注册货币变化监听器
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
+        
+        // Register as listener for data refresh events
+        DataRefreshManager.getInstance().addListener(this);
     }
     
     @Override
@@ -69,6 +74,33 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         // 刷新UI
         revalidate();
         repaint();
+    }
+    
+    @Override
+    public void onDataRefresh(DataRefreshManager.RefreshType type) {
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            type == DataRefreshManager.RefreshType.BUDGETS || 
+            type == DataRefreshManager.RefreshType.ALL) {
+            // Refresh all panels
+            removeAll();
+            
+            // Recreate panels
+            summaryPanel = createSummaryPanel();
+            progressPanel = createCategoryProgressPanel();
+            tipsPanel = createTipsPanel();
+            
+            // Re-add panels
+            add(summaryPanel);
+            add(Box.createVerticalStrut(15));
+            add(progressPanel);
+            add(Box.createVerticalStrut(15));
+            add(tipsPanel);
+            add(Box.createVerticalGlue());
+            
+            // Refresh UI
+            revalidate();
+            repaint();
+        }
     }
     
     private JPanel createSummaryPanel() {
@@ -343,6 +375,8 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
     @Override
     public void removeNotify() {
         super.removeNotify();
+        // Unregister from all listeners
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
+        DataRefreshManager.getInstance().removeListener(this);
     }
 }

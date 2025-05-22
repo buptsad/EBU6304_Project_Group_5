@@ -2,15 +2,22 @@ package com.example.app.ui.dashboard;
 
 import com.example.app.model.FinanceData;
 import com.example.app.model.FinancialAdvice;
+import com.example.app.model.CSVDataImporter;
+import com.example.app.model.DataRefreshListener;
+import com.example.app.model.DataRefreshManager;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public class OverviewPanel extends JPanel {
+public class OverviewPanel extends JPanel implements DataRefreshListener {
+    private static final Logger LOGGER = Logger.getLogger(OverviewPanel.class.getName());
     private FinanceData financeData;
     private JPanel chartPanel;
     private FinancialDetailsPanel detailsPanel;
@@ -20,10 +27,23 @@ public class OverviewPanel extends JPanel {
     
     // Static instance for access across the application
     public static FinancialAdvice sharedAdvice = new FinancialAdvice();
+
+    private String username;
     
-    public OverviewPanel() {
+    public OverviewPanel(String username) {
+        this.username = username;
         // Initialize data model
         financeData = new FinanceData();
+        
+        // Set the data directory for the FinanceData
+        String dataDirectory = ".\\user_data\\" + username;
+        financeData.setDataDirectory(dataDirectory);
+        
+        // Load transaction data before creating UI components
+        loadTransactionData();
+        
+        // Load budget data if needed
+        financeData.loadBudgets();
         
         // Set up panel
         setLayout(new BorderLayout(15, 15));
@@ -48,6 +68,24 @@ public class OverviewPanel extends JPanel {
         
         // Check budget warnings after panel is initialized
         SwingUtilities.invokeLater(this::showBudgetWarnings);
+        
+        // Register as listener for data refresh events
+        DataRefreshManager.getInstance().addListener(this);
+    }
+    
+    /**
+     * Load transaction data from user's CSV file
+     */
+    private void loadTransactionData() {
+        String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
+        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
+        
+        if (transactions != null && !transactions.isEmpty()) {
+            financeData.importTransactions(transactions);
+            LOGGER.log(Level.INFO, "OverviewPanel: Successfully loaded {0} transactions", transactions.size());
+        } else {
+            LOGGER.log(Level.WARNING, "OverviewPanel: No transactions loaded from {0}", csvFilePath);
+        }
     }
     
     private JPanel createChartPanel() {
@@ -119,5 +157,49 @@ public class OverviewPanel extends JPanel {
         if (detailsPanel != null) {
             detailsPanel.updateAdviceDisplay();
         }
+    }
+    
+    @Override
+    public void onDataRefresh(DataRefreshManager.RefreshType type) {
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            type == DataRefreshManager.RefreshType.BUDGETS || 
+            type == DataRefreshManager.RefreshType.ALL) {
+            
+            // Reload transaction data if needed
+            if (type == DataRefreshManager.RefreshType.TRANSACTIONS) {
+                loadTransactionData();
+            }
+            
+            // Reload budget data if needed
+            if (type == DataRefreshManager.RefreshType.BUDGETS) {
+                financeData.loadBudgets();
+                LOGGER.log(Level.INFO, "OverviewPanel: Reloaded budget data after budget refresh notification");
+            }
+            
+            // Get the split pane
+            JSplitPane splitPane = (JSplitPane) getComponent(0);
+            
+            // Update chart
+            JPanel newChartPanel = createChartPanel();
+            splitPane.setLeftComponent(newChartPanel);
+            
+            // Completely replace the details panel with a new instance
+            detailsPanel = new FinancialDetailsPanel(financeData, sharedAdvice);
+            splitPane.setRightComponent(detailsPanel);
+            
+            // Revalidate and repaint to ensure UI updates
+            splitPane.revalidate();
+            splitPane.repaint();
+            
+            // Check for budget warnings
+            SwingUtilities.invokeLater(this::showBudgetWarnings);
+        }
+    }
+    
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        // Unregister when component is removed from UI
+        DataRefreshManager.getInstance().removeListener(this);
     }
 }
