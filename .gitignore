@@ -24,3 +24,7 @@ build
 bin
 gradle
 .vscode
+
+# ignore gradlew
+gradlew.bat
+gradlew
