@@ -22,7 +22,12 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeListener {
+// Add import
+import com.example.app.model.DataRefreshListener;
+import com.example.app.model.DataRefreshManager;
+
+// Update the class declaration
+public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
     
     private final FinanceData financeData = new FinanceData();
     private ChartPanel chartPanel;
@@ -43,6 +48,9 @@ public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeLi
         
         // 注册货币变化监听器
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
+        
+        // Register as listener for data refresh events
+        DataRefreshManager.getInstance().addListener(this);
     }
     
     private JFreeChart createChart() {
@@ -133,10 +141,24 @@ public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeLi
         chartPanel.repaint();
     }
     
+    // Add this method
+    @Override
+    public void onDataRefresh(DataRefreshManager.RefreshType type) {
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            type == DataRefreshManager.RefreshType.ALL) {
+            // Recreate chart and update panel
+            JFreeChart chart = createChart();
+            chartPanel.setChart(chart);
+            chartPanel.repaint();
+        }
+    }
+    
+    // Update removeNotify method
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // 移除组件时取消监听
+        // Unregister from all listeners
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
+        DataRefreshManager.getInstance().removeListener(this);
     }
 }

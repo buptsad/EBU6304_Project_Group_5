@@ -42,7 +42,7 @@ public class CategoryBreakdownPanel extends JPanel implements CurrencyChangeList
     
     private JFreeChart createChart() {
         DefaultPieDataset dataset = createDataset();
-        
+
         String title = "Expense Breakdown by Category (" + timeRange + ")";
         JFreeChart chart = ChartFactory.createPieChart(
                 title,

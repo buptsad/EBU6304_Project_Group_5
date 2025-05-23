@@ -3,6 +3,8 @@ package com.example.app.ui.dashboard.report;
 import com.example.app.model.FinanceData;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
+import com.example.app.model.DataRefreshListener;
+import com.example.app.model.DataRefreshManager;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -17,7 +19,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.Map;
 
-public class CategorySpendingChartPanel extends JPanel implements CurrencyChangeListener {
+public class CategorySpendingChartPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
     
     private final FinanceData financeData = new FinanceData();
     private ChartPanel chartPanel;
@@ -38,6 +40,9 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
         
         // 注册货币变化监听器
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
+        
+        // Register as listener for data refresh events
+        DataRefreshManager.getInstance().addListener(this);
     }
     
     private JFreeChart createChart() {
@@ -114,9 +119,22 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
     }
     
     @Override
+    public void onDataRefresh(DataRefreshManager.RefreshType type) {
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            type == DataRefreshManager.RefreshType.BUDGETS || 
+            type == DataRefreshManager.RefreshType.ALL) {
+            // Recreate chart and update panel
+            JFreeChart chart = createChart();
+            chartPanel.setChart(chart);
+            chartPanel.repaint();
+        }
+    }
+    
+    @Override
     public void removeNotify() {
         super.removeNotify();
-        // 移除组件时取消监听
+        // Unregister from all listeners
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
+        DataRefreshManager.getInstance().removeListener(this);
     }
 }

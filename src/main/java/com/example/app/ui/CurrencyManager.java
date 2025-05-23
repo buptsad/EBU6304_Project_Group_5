@@ -1,128 +1,109 @@
 package com.example.app.ui;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.text.NumberFormat;
-import java.util.Currency;
-import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * 管理货币设置，支持动态通知监听器和本地化金额格式化
+ * 管理应用程序中的货币设置并通知监听器货币变化
  */
 public class CurrencyManager {
-    private static final Logger logger = LoggerFactory.getLogger(CurrencyManager.class);
-    private static volatile CurrencyManager instance;
-    private final ReentrantLock lock = new ReentrantLock();
+    // 单例实例
+    private static CurrencyManager instance;
     
-    // 封装货币对象
-    public static class CurrencyData {
-        private final String code;
-        private final String symbol;
-        
-        public CurrencyData(String code, String symbol) {
-            this.code = code;
-            this.symbol = symbol;
-        }
-        
-        public String getCode() { return code; }
-        public String getSymbol() { return symbol; }
-    }
+    // 当前货币符号 (默认为美元)
+    private String currencySymbol = "$";
     
-    private CurrencyData currentCurrency = new CurrencyData("USD", "$");
-    private final CopyOnWriteArrayList<CurrencyChangeListener> listeners = new CopyOnWriteArrayList<>();
+    // 当前货币编码 (默认为USD)
+    private String currencyCode = "USD";
     
-    // 双重检查锁定单例
-    public static CurrencyManager getInstance() {
+    // 监听器列表 - 使用线程安全的CopyOnWriteArrayList
+    private List<CurrencyChangeListener> listeners = new CopyOnWriteArrayList<>();
+    
+    // 私有构造函数
+    private CurrencyManager() {}
+    
+    /**
+     * 获取单例实例
+     */
+    public static synchronized CurrencyManager getInstance() {
         if (instance == null) {
-            synchronized (CurrencyManager.class) {
-                if (instance == null) {
-                    instance = new CurrencyManager();
-                }
-            }
+            instance = new CurrencyManager();
         }
         return instance;
     }
     
     /**
-     * 设置货币并校验有效性
+     * 获取当前货币符号
+     */
+    public String getCurrencySymbol() {
+        return currencySymbol;
+    }
+    
+    /**
+     * 获取当前货币代码
+     */
+    public String getCurrencyCode() {
+        return currencyCode;
+    }
+    
+    /**
+     * 设置货币信息并通知所有监听器
      */
     public void setCurrency(String code, String symbol) {
-        lock.lock();
-        try {
-            if (!isValidCurrencyCode(code)) {
-                throw new IllegalArgumentException("Invalid ISO 4217 currency code: " + code);
-            }
-            
-            boolean changed = !currentCurrency.getCode().equals(code) || !currentCurrency.getSymbol().equals(symbol);
-            if (changed) {
-                currentCurrency = new CurrencyData(code, symbol);
-                notifyListeners();
-            }
-        } finally {
-            lock.unlock();
+        boolean changed = !this.currencyCode.equals(code) || !this.currencySymbol.equals(symbol);
+        
+        this.currencyCode = code;
+        this.currencySymbol = symbol;
+        
+        if (changed) {
+            notifyListeners();
         }
     }
     
     /**
-     * 校验货币代码是否符合ISO 4217标准
+     * 添加货币变化监听器
      */
-    private boolean isValidCurrencyCode(String code) {
-        try {
-            Currency.getInstance(code);
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
+    public void addCurrencyChangeListener(CurrencyChangeListener listener) {
+        if (!listeners.contains(listener)) {
+            listeners.add(listener);
         }
     }
     
     /**
-     * 获取当前货币数据
+     * 移除货币变化监听器
      */
-    public CurrencyData getCurrency() {
-        return currentCurrency;
-    }
-    
-    /**
-     * 本地化金额格式化
-     */
-    public String formatCurrency(double amount) {
-        NumberFormat format = NumberFormat.getCurrencyInstance(Locale.getDefault());
-        format.setCurrency(Currency.getInstance(currentCurrency.getCode()));
-        return format.format(amount);
-    }
-    
-    /**
-     * 监听器管理
-     */
-    public interface CurrencyChangeListener {
-        void onCurrencyChanged(CurrencyData currency);
-    }
-    
-    public void addListener(CurrencyChangeListener listener) {
-        listeners.addIfAbsent(listener);
-    }
-    
-    public void removeListener(CurrencyChangeListener listener) {
+    public void removeCurrencyChangeListener(CurrencyChangeListener listener) {
         listeners.remove(listener);
     }
     
-    public void clearListeners() {
-        listeners.clear();
+    /**
+     * 通知所有监听器货币已变化
+     */
+    private void notifyListeners() {
+        // 使用CopyOnWriteArrayList可以安全地遍历，即使在遍历期间有修改
+        for (CurrencyChangeListener listener : listeners) {
+            try {
+                listener.onCurrencyChanged(currencyCode, currencySymbol);
+            } catch (Exception e) {
+                // 捕获通知过程中的异常，防止一个监听器的异常影响其他监听器
+                System.err.println("Error notifying listener: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
     }
     
     /**
-     * 通知所有监听器
+     * 格式化金额显示，根据当前货币符号
      */
-    private void notifyListeners() {
-        for (CurrencyChangeListener listener : listeners) {
-            try {
-                listener.onCurrencyChanged(currentCurrency);
-            } catch (Exception e) {
-                logger.error("Failed to notify listener", e);
-            }
-        }
+    public String formatCurrency(double amount) {
+        return String.format("%s%.2f", currencySymbol, amount);
+    }
+    
+    /**
+     * 货币变化监听器接口
+     */
+    public interface CurrencyChangeListener {
+        void onCurrencyChanged(String currencyCode, String currencySymbol);
     }
 }
