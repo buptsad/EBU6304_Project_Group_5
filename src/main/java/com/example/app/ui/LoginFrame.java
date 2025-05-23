@@ -3,6 +3,7 @@ package com.example.app.ui;
 import com.example.app.user_data.UserAuthService;
 import com.example.app.user_data.UserBillStorage;
 import com.example.app.user_data.UserSettingsStorage;
+import com.example.app.user_data.UserBudgetStorage;
 
 
 import javax.swing.*;
@@ -188,6 +189,7 @@ public class LoginFrame extends JFrame {
                 // 成功认证后，初始化存储服务
                 UserBillStorage.setUsername(username);
                 UserSettingsStorage.setUsername(username);
+                UserBudgetStorage.setUsername(username);
                 
                 // 创建并显示主窗口
                 dispose();
