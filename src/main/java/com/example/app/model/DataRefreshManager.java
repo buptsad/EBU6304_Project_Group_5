@@ -23,6 +23,7 @@ public class DataRefreshManager {
         BUDGETS,
         CURRENCY,
         SETTINGS,
+        ADVICE, // <-- Add this line
         ALL
     }
     
