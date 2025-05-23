@@ -140,6 +140,13 @@ public class FinanceData {
         allocateBudgets(expenseCategories);
     }
     
+    public LocalDate getStartDate() {
+    return getDates().stream().min(LocalDate::compareTo).orElse(null);
+}
+
+    public LocalDate getEndDate() {
+        return getDates().stream().max(LocalDate::compareTo).orElse(null);
+    }
     // Add this new method to initialize default budget categories
     private void initializeDefaultBudgets() {
         categoryBudgets.put("Housing", 1400.00);

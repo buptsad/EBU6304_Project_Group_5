@@ -1,36 +1,29 @@
 package com.example.app.ui.dashboard;
 
-import com.example.app.model.FinanceData;
-import com.example.app.model.CSVDataImporter;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
-import com.example.app.model.DataRefreshListener;
-import com.example.app.model.DataRefreshManager;
+import com.example.app.viewmodel.dashboard.DashboardTransactionsViewModel;
+import com.example.app.viewmodel.dashboard.DashboardTransactionsViewModel.TransactionChangeListener;
+import com.example.app.viewmodel.dashboard.DashboardTransactionsViewModel.TransactionEntry;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
 import java.util.List;
 
-public class DashboardTransactionsPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
+public class DashboardTransactionsPanel extends JPanel implements CurrencyChangeListener, TransactionChangeListener {
     private JTable transactionsTable;
-    private FinanceData financeData;
     private DefaultTableModel tableModel;
-    private static final int MAX_TRANSACTIONS = 20; // 显示的最大交易数量
-
-    private String username;
+    private final DashboardTransactionsViewModel viewModel;
     
     public DashboardTransactionsPanel(String username) {
-        this.username = username;
-        financeData = new FinanceData();
+        // Initialize ViewModel
+        this.viewModel = new DashboardTransactionsViewModel(username);
+        this.viewModel.addChangeListener(this);
         
-        // 先从CSV文件加载数据
-        loadTransactionData();
-        
+        // Setup UI
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
         
@@ -50,46 +43,8 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         buttonPanel.add(viewAllButton);
         add(buttonPanel, BorderLayout.SOUTH);
         
-        // 注册货币变化监听器
+        // Register as currency change listener
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
-        
-        // Register as listener for data refresh events
-        DataRefreshManager.getInstance().addListener(this);
-    }
-    
-    /**
-     * 从CSV文件加载交易数据
-     */
-    private void loadTransactionData() {
-        // 使用用户特定的路径
-        String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
-        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
-        
-        if (!transactions.isEmpty()) {
-            financeData.importTransactions(transactions);
-            System.out.println("DashboardTransactionsPanel: 成功导入 " + transactions.size() + " 条交易记录");
-        } else {
-            System.err.println("DashboardTransactionsPanel: 没有交易记录被导入");
-        }
-    }
-    
-    /**
-     * 打开完整交易面板
-     */
-    private void openTransactionsPanel() {
-        // 获取主窗口的引用
-        Window window = SwingUtilities.getWindowAncestor(this);
-        if (window instanceof JFrame) {
-            JFrame frame = (JFrame) window;
-            
-            // 这里可以添加导航到TransactionsPanel的代码
-            // 例如，如果有一个主TabPanel，可以切换到Transactions选项卡
-            // mainTabPanel.setSelectedIndex(transactionsTabIndex);
-            
-            JOptionPane.showMessageDialog(frame, 
-                "查看所有交易记录", 
-                "导航", JOptionPane.INFORMATION_MESSAGE);
-        }
     }
     
     private void createTransactionsTable() {
@@ -110,8 +65,8 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
             }
         };
         
-        // Use FinanceData to populate the table
-        populateTableWithRecentTransactions(tableModel);
+        // Populate table with data from ViewModel
+        populateTableWithRecentTransactions();
         
         // Create and configure table
         transactionsTable = new JTable(tableModel);
@@ -126,12 +81,12 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         transactionsTable.getColumnModel().getColumn(2).setPreferredWidth(120); // Category
         transactionsTable.getColumnModel().getColumn(3).setPreferredWidth(100); // Amount
         
-        // 应用金额列格式化渲染器
+        // Apply custom renderer for amount column
         updateAmountRenderer();
     }
-
+    
     private void updateAmountRenderer() {
-        // 获取货币符号
+        // Get currency symbol from CurrencyManager
         final String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
         
         // Create a custom renderer to color amounts (red for negative, green for positive)
@@ -166,35 +121,17 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         }
     }
     
-    private void populateTableWithRecentTransactions(DefaultTableModel model) {
+    private void populateTableWithRecentTransactions() {
+        // Clear existing data
+        tableModel.setRowCount(0);
+        
+        // Get transactions from ViewModel
+        List<TransactionEntry> recentTransactions = viewModel.getRecentTransactions();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         
-        // 获取所有交易记录
-        List<FinanceData.Transaction> allTransactions = financeData.getTransactions();
-        
-        // 创建一个可以排序的交易记录列表
-        List<TransactionEntry> transactionEntries = new ArrayList<>();
-        
-        // 将 FinanceData.Transaction 对象转换为 TransactionEntry 对象
-        for (FinanceData.Transaction transaction : allTransactions) {
-            transactionEntries.add(new TransactionEntry(
-                transaction.getDate(),
-                transaction.getDescription(),
-                transaction.getCategory(),
-                transaction.getAmount()
-            ));
-        }
-        
-        // 按日期倒序排序（最新的在前）
-        transactionEntries.sort(Comparator.comparing(TransactionEntry::getDate).reversed());
-        
-        // 只保留前MAX_TRANSACTIONS个记录
-        int displayCount = Math.min(MAX_TRANSACTIONS, transactionEntries.size());
-        List<TransactionEntry> recentTransactions = transactionEntries.subList(0, displayCount);
-        
-        // 添加交易记录到表格模型
+        // Add transactions to table model
         for (TransactionEntry entry : recentTransactions) {
-            model.addRow(new Object[] {
+            tableModel.addRow(new Object[] {
                 entry.getDate().format(formatter),
                 entry.getDescription(),
                 entry.getCategory(),
@@ -203,43 +140,33 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         }
     }
     
-    // Helper class to store and sort transaction data
-    private static class TransactionEntry {
-        private LocalDate date;
-        private String description;
-        private String category;
-        private double amount;
-        
-        public TransactionEntry(LocalDate date, String description, String category, double amount) {
-            this.date = date;
-            this.description = description;
-            this.category = category;
-            this.amount = amount;
+    private void openTransactionsPanel() {
+        // Get the main window reference
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window instanceof JFrame) {
+            JFrame frame = (JFrame) window;
+            
+            // This would navigate to the full TransactionsPanel
+            // In a real app, this might be handled by a navigation controller or router
+            JOptionPane.showMessageDialog(frame, 
+                "View All Transactions", 
+                "Navigation", JOptionPane.INFORMATION_MESSAGE);
         }
-        
-        public LocalDate getDate() { return date; }
-        public String getDescription() { return description; }
-        public String getCategory() { return category; }
-        public double getAmount() { return amount; }
     }
-
+    
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
-        // 货币变化时更新渲染器并刷新表格
+        // Update currency formatter
         updateAmountRenderer();
         transactionsTable.repaint();
     }
     
     @Override
-    public void onDataRefresh(DataRefreshManager.RefreshType type) {
-        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
-            type == DataRefreshManager.RefreshType.ALL) {
-            // Reload data
-            loadTransactionData();
-            
-            // Refresh table
-            tableModel.setRowCount(0);
-            populateTableWithRecentTransactions(tableModel);
+    public void onTransactionsChanged() {
+        // Called by ViewModel when transaction data changes
+        SwingUtilities.invokeLater(() -> {
+            // Update table data
+            populateTableWithRecentTransactions();
             
             // Update currency formatting
             updateAmountRenderer();
@@ -247,14 +174,15 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
             // Refresh UI
             transactionsTable.revalidate();
             transactionsTable.repaint();
-        }
+        });
     }
     
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // Unregister from all listeners
+        // Clean up when panel is removed
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
-        DataRefreshManager.getInstance().removeListener(this);
+        viewModel.removeChangeListener(this);
+        viewModel.cleanup();
     }
 }
