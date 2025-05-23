@@ -1,11 +1,8 @@
 package com.example.app.ui.dashboard;
 
-import com.example.app.model.FinanceData;
-import com.example.app.model.FinancialAdvice;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
-import com.example.app.model.DataRefreshListener;
-import com.example.app.model.DataRefreshManager;
+import com.example.app.viewmodel.dashboard.FinancialDetailsViewModel;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -13,32 +10,35 @@ import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.util.Map;
 
-public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
-    private FinanceData financeData;
-    private FinancialAdvice financialAdvice;
+/**
+ * Panel that displays financial details using MVVM pattern.
+ * This is the View component that observes the ViewModel.
+ */
+public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListener, 
+                                                           FinancialDetailsViewModel.FinancialDetailsChangeListener {
+    // Reference to the ViewModel
+    private final FinancialDetailsViewModel viewModel;
+    
+    // UI components
     private JPanel summaryPanel;
     private JPanel progressPanel;
     private JPanel tipsPanel;
     private JTextArea tipArea;
     private JLabel adviceTimeLabel;
     
-    public FinancialDetailsPanel(FinanceData financeData) {
-        this(financeData, OverviewPanel.sharedAdvice);
-    }
-    
-    public FinancialDetailsPanel(FinanceData financeData, FinancialAdvice financialAdvice) {
-        this.financeData = financeData;
-        this.financialAdvice = financialAdvice;
+    public FinancialDetailsPanel(FinancialDetailsViewModel viewModel) {
+        this.viewModel = viewModel;
         
+        // Set up UI
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(new EmptyBorder(0, 10, 0, 0));
         
-        // 创建面板
+        // Create panels
         summaryPanel = createSummaryPanel();
         progressPanel = createCategoryProgressPanel();
         tipsPanel = createTipsPanel();
         
-        // 添加面板
+        // Add panels
         add(summaryPanel);
         add(Box.createVerticalStrut(15));
         add(progressPanel);
@@ -46,24 +46,36 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         add(tipsPanel);
         add(Box.createVerticalGlue());
         
-        // 注册货币变化监听器
+        // Register listeners
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
-        
-        // Register as listener for data refresh events
-        DataRefreshManager.getInstance().addListener(this);
+        viewModel.addChangeListener(this);
     }
     
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
-        // 当货币变化时刷新显示
+        // When currency changes, refresh all panels
+        refreshAllPanels();
+    }
+    
+    @Override
+    public void onFinancialDataChanged() {
+        // When financial data changes, refresh all panels
+        refreshAllPanels();
+    }
+    
+    @Override
+    public void onAdviceChanged() {
+        // When only advice changes, just update that part
+        updateAdviceDisplay();
+    }
+    
+    private void refreshAllPanels() {
         removeAll();
         
-        // 重新创建面板
         summaryPanel = createSummaryPanel();
         progressPanel = createCategoryProgressPanel();
         tipsPanel = createTipsPanel();
         
-        // 重新添加面板
         add(summaryPanel);
         add(Box.createVerticalStrut(15));
         add(progressPanel);
@@ -71,42 +83,11 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         add(tipsPanel);
         add(Box.createVerticalGlue());
         
-        // 刷新UI
         revalidate();
         repaint();
     }
     
-    @Override
-    public void onDataRefresh(DataRefreshManager.RefreshType type) {
-        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
-            type == DataRefreshManager.RefreshType.BUDGETS || 
-            type == DataRefreshManager.RefreshType.ALL) {
-            // Refresh all panels
-            removeAll();
-            
-            // Recreate panels
-            summaryPanel = createSummaryPanel();
-            progressPanel = createCategoryProgressPanel();
-            tipsPanel = createTipsPanel();
-            
-            // Re-add panels
-            add(summaryPanel);
-            add(Box.createVerticalStrut(15));
-            add(progressPanel);
-            add(Box.createVerticalStrut(15));
-            add(tipsPanel);
-            add(Box.createVerticalGlue());
-            
-            // Refresh UI
-            revalidate();
-            repaint();
-        }
-    }
-    
     private JPanel createSummaryPanel() {
-        // ... existing code unchanged ...
-        
-        // Same as before
         JPanel summaryPanel = new JPanel();
         summaryPanel.setLayout(new BoxLayout(summaryPanel, BoxLayout.Y_AXIS));
         summaryPanel.setBorder(BorderFactory.createCompoundBorder(
@@ -121,32 +102,29 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         ));
         summaryPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
-        // 使用CurrencyManager格式化金额
+        // Format currency values using CurrencyManager
         CurrencyManager cm = CurrencyManager.getInstance();
         
-        // 添加摘要项
+        // Add summary items using data from ViewModel
         summaryPanel.add(createLabelPanel("Monthly Budget:", 
-            cm.formatCurrency(financeData.getMonthlyBudget())));
+            cm.formatCurrency(viewModel.getMonthlyBudget())));
         summaryPanel.add(Box.createVerticalStrut(10));
         
         summaryPanel.add(createLabelPanel("Total Income:", 
-            cm.formatCurrency(financeData.getTotalIncome())));
+            cm.formatCurrency(viewModel.getTotalIncome())));
         summaryPanel.add(Box.createVerticalStrut(10));
         
         summaryPanel.add(createLabelPanel("Total Expenses:", 
-            cm.formatCurrency(financeData.getTotalExpenses())));
+            cm.formatCurrency(viewModel.getTotalExpenses())));
         summaryPanel.add(Box.createVerticalStrut(10));
         
         summaryPanel.add(createLabelPanel("Net Savings:", 
-            cm.formatCurrency(financeData.getTotalSavings())));
+            cm.formatCurrency(viewModel.getTotalSavings())));
         
         return summaryPanel;
     }
     
     private JPanel createCategoryProgressPanel() {
-        // ... existing code unchanged ...
-        
-        // Same as before
         JPanel progressPanel = new JPanel();
         progressPanel.setLayout(new BoxLayout(progressPanel, BoxLayout.Y_AXIS));
         progressPanel.setBorder(BorderFactory.createCompoundBorder(
@@ -161,19 +139,19 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         ));
         progressPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
-        // 使用CurrencyManager格式化金额
+        // Format currency values using CurrencyManager
         CurrencyManager cm = CurrencyManager.getInstance();
         
-        // 添加总体预算进度
-        double overallPercentage = financeData.getOverallBudgetPercentage();
+        // Add overall budget progress
+        double overallPercentage = viewModel.getOverallBudgetPercentage();
         JPanel overallPanel = new JPanel();
         overallPanel.setLayout(new BoxLayout(overallPanel, BoxLayout.Y_AXIS));
         overallPanel.setBorder(BorderFactory.createTitledBorder("Overall"));
         overallPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
         JLabel overallLabel = new JLabel(String.format("%s of %s (%.1f%%)", 
-            cm.formatCurrency(financeData.getTotalExpenses()), 
-            cm.formatCurrency(financeData.getMonthlyBudget()),
+            cm.formatCurrency(viewModel.getTotalExpenses()), 
+            cm.formatCurrency(viewModel.getMonthlyBudget()),
             overallPercentage));
         overallLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
@@ -188,20 +166,21 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         progressPanel.add(overallPanel);
         progressPanel.add(Box.createVerticalStrut(15));
         
-        // 添加分类预算进度条面板
+        // Add category progress bars panel
         JPanel categoriesPanel = new JPanel();
         categoriesPanel.setLayout(new BoxLayout(categoriesPanel, BoxLayout.Y_AXIS));
         categoriesPanel.setBorder(BorderFactory.createTitledBorder("Categories"));
         categoriesPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
-        // 为每个分类添加进度条
-        Map<String, Double> categoryBudgets = financeData.getCategoryBudgets();
-        Map<String, Double> categoryExpenses = financeData.getCategoryExpenses();
+        // Get category data from ViewModel
+        Map<String, Double> categoryBudgets = viewModel.getCategoryBudgets();
+        Map<String, Double> categoryExpenses = viewModel.getCategoryExpenses();
         
+        // Add a progress bar for each category
         for (String category : categoryBudgets.keySet()) {
             double budget = categoryBudgets.get(category);
             double expense = categoryExpenses.getOrDefault(category, 0.0);
-            double percentage = (expense / budget) * 100;
+            double percentage = budget > 0 ? (expense / budget) * 100 : 0;
             
             JPanel categoryPanel = new JPanel(new GridBagLayout());
             categoryPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
@@ -211,7 +190,7 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
             gbc.fill = GridBagConstraints.HORIZONTAL;
             gbc.insets = new Insets(0, 0, 0, 5);
             
-            // 分类标签
+            // Category label
             JLabel categoryLabel = new JLabel(category);
             categoryLabel.setPreferredSize(new Dimension(100, 20));
             gbc.gridx = 0;
@@ -219,13 +198,13 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
             gbc.weightx = 0.0;
             categoryPanel.add(categoryLabel, gbc);
             
-            // 进度条
+            // Progress bar
             JProgressBar progressBar = createProgressBar(percentage);
             gbc.gridx = 1;
             gbc.weightx = 1.0;
             categoryPanel.add(progressBar, gbc);
             
-            // 数值标签 - 使用CurrencyManager格式化
+            // Value label - format using CurrencyManager
             JLabel valueLabel = new JLabel(String.format("%s / %s", 
                 cm.formatCurrency(expense), cm.formatCurrency(budget)));
             valueLabel.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -244,8 +223,6 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
     }
     
     private JProgressBar createProgressBar(double percentage) {
-        // ... existing code unchanged ...
-        
         JProgressBar progressBar = new JProgressBar(0, 100);
         progressBar.setValue((int) percentage);
         progressBar.setStringPainted(true);
@@ -277,10 +254,10 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         ));
         tipsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
-        // Check for categories that are over budget
+        // Generate tips based on budget data from ViewModel
         StringBuilder tipText = new StringBuilder();
-        Map<String, Double> categoryBudgets = financeData.getCategoryBudgets();
-        Map<String, Double> categoryExpenses = financeData.getCategoryExpenses();
+        Map<String, Double> categoryBudgets = viewModel.getCategoryBudgets();
+        Map<String, Double> categoryExpenses = viewModel.getCategoryExpenses();
         String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
         
         boolean foundOverBudget = false;
@@ -294,14 +271,13 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
                     foundOverBudget = true;
                 }
                 double overage = expense - budget;
-                // 使用当前货币符号
                 tipText.append(String.format("• %s is %s%.2f over budget\n", 
                     category, currencySymbol, overage));
             }
         }
         
         // Add general tip based on overall budget
-        double percentUsed = financeData.getOverallBudgetPercentage();
+        double percentUsed = viewModel.getOverallBudgetPercentage();
         if (!foundOverBudget) {
             if (percentUsed > 90) {
                 tipText.append("You're close to exceeding your overall budget. Consider reducing non-essential expenses.");
@@ -314,10 +290,10 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
             tipText.append("\nConsider adjusting your spending in the categories above.");
         }
         
-        // Add local financial context
+        // Add financial advice from ViewModel
         tipText.append("\n\n");
         tipText.append("Local Financial Context:\n");
-        tipText.append(financialAdvice.getAdvice());
+        tipText.append(viewModel.getAdvice());
         
         tipArea = new JTextArea(tipText.toString());
         tipArea.setWrapStyleWord(true);
@@ -332,8 +308,8 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         contentPanel.setBackground(UIManager.getColor("Panel.background"));
         contentPanel.add(tipArea, BorderLayout.CENTER);
         
-        // Add generation time at the bottom
-        adviceTimeLabel = new JLabel("Financial context generated: " + financialAdvice.getFormattedGenerationTime());
+        // Add generation time at the bottom using data from ViewModel
+        adviceTimeLabel = new JLabel("Financial context generated: " + viewModel.getFormattedGenerationTime());
         adviceTimeLabel.setFont(new Font(adviceTimeLabel.getFont().getName(), Font.ITALIC, 11));
         adviceTimeLabel.setForeground(UIManager.getColor("Label.disabledForeground"));
         contentPanel.add(adviceTimeLabel, BorderLayout.SOUTH);
@@ -344,8 +320,6 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
     }
     
     private JPanel createLabelPanel(String label, String value) {
-        // ... existing code unchanged ...
-        
         JPanel panel = new JPanel(new BorderLayout(10, 0));
         panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 25));
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -371,12 +345,13 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
             repaint();
         }
     }
-
+    
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // Unregister from all listeners
+        // Clean up when panel is removed from UI
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
-        DataRefreshManager.getInstance().removeListener(this);
+        viewModel.removeChangeListener(this);
+        viewModel.cleanup();
     }
 }
