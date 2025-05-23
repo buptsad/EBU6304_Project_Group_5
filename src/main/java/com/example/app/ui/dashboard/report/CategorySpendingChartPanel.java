@@ -1,10 +1,10 @@
 package com.example.app.ui.dashboard.report;
 
-import com.example.app.model.FinanceData;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
-import com.example.app.model.DataRefreshListener;
-import com.example.app.model.DataRefreshManager;
+import com.example.app.viewmodel.dashboard.report.CategorySpendingChartViewModel;
+import com.example.app.viewmodel.dashboard.report.CategorySpendingChartViewModel.ChartDataChangeListener;
+
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -19,12 +19,15 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.Map;
 
-public class CategorySpendingChartPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
+public class CategorySpendingChartPanel extends JPanel implements CurrencyChangeListener, ChartDataChangeListener {
     
-    private final FinanceData financeData = new FinanceData();
+    private final CategorySpendingChartViewModel viewModel;
     private ChartPanel chartPanel;
     
-    public CategorySpendingChartPanel() {
+    public CategorySpendingChartPanel(CategorySpendingChartViewModel viewModel) {
+        this.viewModel = viewModel;
+        this.viewModel.addChangeListener(this);
+        
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createTitledBorder("Spending by Category"),
@@ -38,18 +41,15 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
         
         add(chartPanel, BorderLayout.CENTER);
         
-        // 注册货币变化监听器
+        // Register as currency change listener
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
-        
-        // Register as listener for data refresh events
-        DataRefreshManager.getInstance().addListener(this);
     }
     
     private JFreeChart createChart() {
         // Create dataset for the chart
         DefaultCategoryDataset dataset = createDataset();
         
-        // 获取当前货币符号
+        // Get current currency symbol
         String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
         
         // Create the chart
@@ -94,9 +94,9 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
     private DefaultCategoryDataset createDataset() {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         
-        // Get data from the model
-        Map<String, Double> categoryBudgets = financeData.getCategoryBudgets();
-        Map<String, Double> categoryExpenses = financeData.getCategoryExpenses();
+        // Get data from the ViewModel
+        Map<String, Double> categoryBudgets = viewModel.getCategoryBudgets();
+        Map<String, Double> categoryExpenses = viewModel.getCategoryExpenses();
         
         // Add budget and expense data for each category
         for (String category : categoryBudgets.keySet()) {
@@ -112,29 +112,31 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
 
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
-        // 货币变化时刷新图表
+        // Refresh chart when currency changes
+        refreshChart();
+    }
+    
+    @Override
+    public void onChartDataChanged() {
+        // Called by ViewModel when data changes
+        SwingUtilities.invokeLater(this::refreshChart);
+    }
+    
+    /**
+     * Refresh the chart with current data
+     */
+    public void refreshChart() {
         JFreeChart chart = createChart();
         chartPanel.setChart(chart);
         chartPanel.repaint();
     }
     
     @Override
-    public void onDataRefresh(DataRefreshManager.RefreshType type) {
-        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
-            type == DataRefreshManager.RefreshType.BUDGETS || 
-            type == DataRefreshManager.RefreshType.ALL) {
-            // Recreate chart and update panel
-            JFreeChart chart = createChart();
-            chartPanel.setChart(chart);
-            chartPanel.repaint();
-        }
-    }
-    
-    @Override
     public void removeNotify() {
         super.removeNotify();
-        // Unregister from all listeners
+        // Clean up when panel is removed
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
-        DataRefreshManager.getInstance().removeListener(this);
+        viewModel.removeChangeListener(this);
+        viewModel.cleanup();
     }
 }

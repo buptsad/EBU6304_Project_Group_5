@@ -11,29 +11,32 @@ repositories {
 }
 
 dependencies {
-    // FlatLaF - Flat Look and Feel
+    /* ───── UI / 工具 / 图表 ─────────────────────────────────── */
     implementation 'com.formdev:flatlaf:3.5'
-    
-    // Additional FlatLaF themes (optional)
     implementation 'com.formdev:flatlaf-intellij-themes:3.5'
-    
-    // JFreeChart for charts and graphs
     implementation 'org.jfree:jfreechart:1.5.4'
-
-    // Set of Utilities for Java, especially Chinese Date
     implementation 'cn.hutool:hutool-all:5.8.16'
-
     implementation 'org.json:json:20250107'
 
-    implementation 'org.json:json:20250107'
-    
+    /* ───── JSON 处理 ─────────────────────────────────────────── */
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.3'
+
+    /* ───── Spring Web（含 RestTemplate 等）──────────────────── */
+    implementation platform('org.springframework:spring-framework-bom:6.2.3')
+    implementation 'org.springframework:spring-web'
+
+    /* ───── Lombok（编译期依赖）──────────────────────────────── */
+    compileOnly            'org.projectlombok:lombok:1.18.38'
+    annotationProcessor    'org.projectlombok:lombok:1.18.38'
+    testCompileOnly        'org.projectlombok:lombok:1.18.38'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.38'
+
+    /* ───── 测试库 ──────────────────────────────────────────── */
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
-
+    testRuntimeOnly   'org.junit.jupiter:junit-jupiter-engine:5.10.2'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'com.jayway.jsonpath:json-path:2.9.0'
     testImplementation 'org.mockito:mockito-core:4.2.0'
-
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
 }
 
 application {
@@ -48,13 +51,10 @@ tasks.named('jar') {
     manifest {
         attributes 'Main-Class': 'com.example.app.Main'
     }
-    
-    // Modern approach to creating a fat JAR
+
+    /* 将所有运行时依赖打入可执行 fat‑JAR */
     from {
-        configurations.runtimeClasspath.collect { 
-            it.isDirectory() ? it : zipTree(it) 
-        }
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
-    
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
