@@ -2,32 +2,35 @@ package com.example.app.ui.dashboard;
 
 import javax.swing.*;
 
-import com.example.app.model.CSVDataImporter;
-import com.example.app.model.FinanceData;
 import com.example.app.ui.CurrencyManager;
-import com.example.app.ui.reports.*;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
 import com.example.app.ui.dashboard.report.CategorySpendingChartPanel;
 import com.example.app.ui.dashboard.report.IncomeExpensesChartPanel;
-import com.example.app.model.DataRefreshListener;
-import com.example.app.model.DataRefreshManager;
+import com.example.app.viewmodel.dashboard.DashboardReportsViewModel;
+import com.example.app.viewmodel.dashboard.DashboardReportsViewModel.ReportDataChangeListener;
+import com.example.app.viewmodel.dashboard.report.CategorySpendingChartViewModel;
+import com.example.app.viewmodel.dashboard.report.IncomeExpensesChartViewModel;
 
 import java.awt.*;
-import java.util.List;
 
-public class DashboardReportsPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
+public class DashboardReportsPanel extends JPanel implements CurrencyChangeListener, ReportDataChangeListener {
     
-    private final FinanceData financeData = new FinanceData();
-    private IncomeExpensesReportPanel incomeExpensesPanel;
-    private CategoryBreakdownPanel categoryBreakdownPanel;
-    private String username; // 添加用户名字段
+    // ViewModels
+    private final DashboardReportsViewModel viewModel;
+    private final IncomeExpensesChartViewModel incomeExpensesViewModel;
+    private final CategorySpendingChartViewModel categorySpendingViewModel;
     
-    public DashboardReportsPanel(String username) { // 修改构造函数接收用户名
-        this.username = username; // 保存用户名
+    // UI components
+    private IncomeExpensesChartPanel incomeExpensesPanel;
+    private CategorySpendingChartPanel categorySpendingPanel;
+    
+    public DashboardReportsPanel(String username) {
+        // Initialize ViewModels
+        this.viewModel = new DashboardReportsViewModel(username);
+        this.viewModel.addChangeListener(this);
         
-        // 初始化财务数据
-        // 从文件加载交易数据
-        loadTransactionData();
+        this.incomeExpensesViewModel = new IncomeExpensesChartViewModel(viewModel.getFinanceData());
+        this.categorySpendingViewModel = new CategorySpendingChartViewModel(viewModel.getFinanceData());
         
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
@@ -40,13 +43,13 @@ public class DashboardReportsPanel extends JPanel implements CurrencyChangeListe
         JPanel chartsPanel = new JPanel(new GridLayout(2, 1, 0, 20));
         chartsPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
-        // 创建图表并传入财务数据
-        incomeExpensesPanel = new IncomeExpensesReportPanel(financeData);
-        categoryBreakdownPanel = new CategoryBreakdownPanel(financeData);
+        // Create chart panels with their ViewModels
+        incomeExpensesPanel = new IncomeExpensesChartPanel(incomeExpensesViewModel);
+        categorySpendingPanel = new CategorySpendingChartPanel(categorySpendingViewModel);
         
-        // Add the two chart panels
+        // Add the chart panels
         chartsPanel.add(incomeExpensesPanel);
-        chartsPanel.add(categoryBreakdownPanel);
+        chartsPanel.add(categorySpendingPanel);
         
         // Add to main panel with scroll support
         JScrollPane scrollPane = new JScrollPane(chartsPanel);
@@ -54,84 +57,50 @@ public class DashboardReportsPanel extends JPanel implements CurrencyChangeListe
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(scrollPane, BorderLayout.CENTER);
         
-        // 添加一个查看完整报表的按钮
+        // Add a button for viewing full reports
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton viewFullReportsButton = new JButton("View Full Reports");
         viewFullReportsButton.addActionListener(e -> openFullReports());
         buttonPanel.add(viewFullReportsButton);
         add(buttonPanel, BorderLayout.SOUTH);
         
-        // 注册货币变化监听
+        // Register as currency change listener
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
-        
-        // Register as listener for data refresh events
-        DataRefreshManager.getInstance().addListener(this);
     }
     
     /**
-     * 从CSV文件加载交易数据
-     */
-    private void loadTransactionData() {
-        // 使用用户特定的路径
-        String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
-        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
-        
-        if (!transactions.isEmpty()) {
-            financeData.importTransactions(transactions);
-            System.out.println("DashboardReportsPanel: 成功导入 " + transactions.size() + " 条交易记录");
-        } else {
-            System.err.println("DashboardReportsPanel: 没有交易记录被导入");
-        }
-    }
-    
-    /**
-     * 打开完整报表面板
+     * Open the full reports panel
      */
     private void openFullReports() {
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window instanceof JFrame) {
             JFrame frame = (JFrame) window;
-            // 这里添加导航到完整报表的逻辑
+            // This would navigate to the full reports panel
             JOptionPane.showMessageDialog(frame, 
-                "查看完整财务报表", 
-                "导航", JOptionPane.INFORMATION_MESSAGE);
+                "View Full Financial Reports", 
+                "Navigation", JOptionPane.INFORMATION_MESSAGE);
         }
     }
     
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
-        // 货币变化时刷新图表
-        if (incomeExpensesPanel != null) {
-            incomeExpensesPanel.refreshChart();
-        }
-        if (categoryBreakdownPanel != null) {
-            categoryBreakdownPanel.refreshChart();
-        }
+        // Currency changes will be handled by individual chart panels
     }
     
     @Override
-    public void onDataRefresh(DataRefreshManager.RefreshType type) {
-        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
-            type == DataRefreshManager.RefreshType.ALL) {
-            // Reload transaction data
-            loadTransactionData();
-            
-            // Refresh charts
-            if (incomeExpensesPanel != null) {
-                incomeExpensesPanel.refreshChart();
-            }
-            
-            if (categoryBreakdownPanel != null) {
-                categoryBreakdownPanel.refreshChart();
-            }
-        }
+    public void onReportDataChanged() {
+        // Data changes will be handled by individual chart panels
+        // which are already listening to their own ViewModels
     }
     
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // 移除组件时取消监听
+        // Clean up when panel is removed
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
-        DataRefreshManager.getInstance().removeListener(this);
+        viewModel.removeChangeListener(this);
+        viewModel.cleanup();
+        
+        // No need to clean up child ViewModels as their panels handle that
     }
 }
