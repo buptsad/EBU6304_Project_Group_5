@@ -1,8 +1,10 @@
 package com.example.app.ui.reports;
 
-import com.example.app.model.FinanceData;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
+import com.example.app.viewmodel.reports.TrendReportViewModel;
+import com.example.app.viewmodel.reports.TrendReportViewModel.ChartDataChangeListener;
+
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -17,19 +19,19 @@ import java.awt.*;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.List;
 
-public class TrendReportPanel extends JPanel implements CurrencyChangeListener {
+public class TrendReportPanel extends JPanel implements CurrencyChangeListener, ChartDataChangeListener {
     
-    private final FinanceData financeData;
+    private final TrendReportViewModel viewModel;
     private ChartPanel chartPanel;
     private String timeRange = "Last 30 days";
     private String interval = "Daily";
     
-    public TrendReportPanel(FinanceData financeData) {
-        this.financeData = financeData;
+    public TrendReportPanel(TrendReportViewModel viewModel) {
+        this.viewModel = viewModel;
+        this.viewModel.addChangeListener(this);
         
         setLayout(new BorderLayout());
         
@@ -41,14 +43,14 @@ public class TrendReportPanel extends JPanel implements CurrencyChangeListener {
         
         add(chartPanel, BorderLayout.CENTER);
         
-        // 注册货币变化监听器
+        // Register as currency change listener
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
     }
     
     private JFreeChart createChart() {
         XYDataset dataset = createDataset();
         
-        // 获取当前货币符号
+        // Get current currency symbol
         String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
         
         String title = "Financial Trends - " + interval + " (" + timeRange + ")";
@@ -94,17 +96,14 @@ public class TrendReportPanel extends JPanel implements CurrencyChangeListener {
     }
     
     private XYDataset createDataset() {
-        // Create time series for income, expenses, and budget
         TimeSeries incomeSeries = new TimeSeries("Income");
         TimeSeries expensesSeries = new TimeSeries("Expenses");
         TimeSeries budgetSeries = new TimeSeries("Budget");
         
-        // Get data from the model
-        List<LocalDate> dates = financeData.getDates();
-        Map<LocalDate, Double> incomes = financeData.getDailyIncomes();
-        Map<LocalDate, Double> expenses = financeData.getDailyExpenses();
+        List<LocalDate> dates = viewModel.getDates();
+        Map<LocalDate, Double> incomes = viewModel.getDailyIncomes();
+        Map<LocalDate, Double> expenses = viewModel.getDailyExpenses();
         
-        // Filter dates based on time range
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = getStartDateFromRange(timeRange);
         
@@ -112,34 +111,41 @@ public class TrendReportPanel extends JPanel implements CurrencyChangeListener {
         Map<RegularTimePeriod, Double> groupedIncomes = new HashMap<>();
         Map<RegularTimePeriod, Double> groupedExpenses = new HashMap<>();
         
-        for (LocalDate date : dates) {
-            if (date.isAfter(startDate.minusDays(1)) && date.isBefore(endDate.plusDays(1))) {
-                Date utilDate = Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant());
-                RegularTimePeriod period = getTimePeriod(utilDate);
-                
-                Double income = incomes.get(date);
-                Double expense = expenses.get(date);
-                
-                if (income != null) {
-                    groupedIncomes.put(period, groupedIncomes.getOrDefault(period, 0.0) + income);
-                }
-                
-                if (expense != null) {
-                    groupedExpenses.put(period, groupedExpenses.getOrDefault(period, 0.0) + expense);
-                }
+        // Process all dates in the range, not just those with existing data
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            Date utilDate = Date.from(currentDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+            RegularTimePeriod period = getTimePeriod(utilDate);
+            
+            // Initialize period if not exists
+            groupedIncomes.putIfAbsent(period, 0.0);
+            groupedExpenses.putIfAbsent(period, 0.0);
+            
+            // Add actual data if available
+            Double income = incomes.get(currentDate);
+            Double expense = expenses.get(currentDate);
+            
+            if (income != null) {
+                groupedIncomes.put(period, groupedIncomes.get(period) + income);
             }
+            
+            if (expense != null) {
+                groupedExpenses.put(period, groupedExpenses.get(period) + expense);
+            }
+            
+            currentDate = currentDate.plusDays(1);
         }
         
         // Add data to series
         for (RegularTimePeriod period : getSortedPeriods(groupedIncomes.keySet())) {
-            if (groupedIncomes.containsKey(period)) {
-                incomeSeries.add(period, groupedIncomes.get(period));
+            Double income = groupedIncomes.get(period);
+            Double expense = groupedExpenses.get(period);
+            
+            if (income != null) {
+                incomeSeries.add(period, income);
             }
-        }
-        
-        for (RegularTimePeriod period : getSortedPeriods(groupedExpenses.keySet())) {
-            if (groupedExpenses.containsKey(period)) {
-                expensesSeries.add(period, groupedExpenses.get(period));
+            if (expense != null) {
+                expensesSeries.add(period, expense);
             }
             
             // Add budget line based on interval
@@ -168,9 +174,10 @@ public class TrendReportPanel extends JPanel implements CurrencyChangeListener {
             case "Weekly":
                 return new Week(date);
             case "Fortnightly":
-                // JFreeChart doesn't have a built-in fortnight period
                 Week week = new Week(date);
-                return new Week((week.getWeek() + 1) / 2, week.getYear());
+                // Group weeks into pairs - create a consistent fortnight grouping
+                int fortnightNumber = (week.getWeek() - 1) / 2;
+                return new Week(fortnightNumber * 2 + 1, week.getYear());
             case "Monthly":
                 return new Month(date);
             case "Quarterly":
@@ -183,10 +190,10 @@ public class TrendReportPanel extends JPanel implements CurrencyChangeListener {
     }
     
     private double calculateBudgetForPeriod(RegularTimePeriod period) {
-        double monthlyBudget = financeData.getMonthlyBudget();
+        double monthlyBudget = viewModel.getMonthlyBudget();
         
         if (period instanceof Day) {
-            return financeData.getDailyBudget();
+            return viewModel.getDailyBudget();
         } else if (period instanceof Week) {
             return monthlyBudget / 4.33;  // Average weeks per month
         } else if (period instanceof Month) {
@@ -196,8 +203,8 @@ public class TrendReportPanel extends JPanel implements CurrencyChangeListener {
         } else if (period instanceof Year) {
             return monthlyBudget * 12;
         } else {
-            // Handle fortnightly (2 weeks) as special case
-            return monthlyBudget / 2.165;  // Half of monthly
+            // Default for any other period type
+            return monthlyBudget / 2.165;  // Fortnightly approximation
         }
     }
     
@@ -263,14 +270,22 @@ public class TrendReportPanel extends JPanel implements CurrencyChangeListener {
 
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
-        // 货币变化时刷新图表
+        // Refresh chart when currency changes
         refreshChart();
+    }
+    
+    @Override
+    public void onChartDataChanged() {
+        // Called by ViewModel when data changes
+        SwingUtilities.invokeLater(this::refreshChart);
     }
     
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // 移除组件时取消监听
+        // Clean up when panel is removed
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
+        viewModel.removeChangeListener(this);
+        viewModel.cleanup();
     }
 }

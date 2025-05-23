@@ -1,33 +1,64 @@
 package com.example.app.ui.pages;
 
-import com.example.app.ui.dashboard.OverviewPanel;
-import com.example.app.ui.pages.AI.getRes;
+import com.example.app.viewmodel.AIViewModel;
+import com.example.app.viewmodel.AIViewModel.ChatMessage;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.IOException;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
-
-public class AIPanel extends JPanel {
+/**
+ * AI Panel View component in MVVM architecture.
+ * Handles only UI representation and forwards user actions to the ViewModel.
+ */
+public class AIPanel extends JPanel implements AIViewModel.AIDataChangeListener {
+    // Reference to the ViewModel
+    private final AIViewModel viewModel;
+    
+    // UI components
     private JTextArea chatArea;
     private JTextField inputField;
     private JButton sendButton;
-    private String username;
+    private JButton regenerateButton;
 
     public AIPanel(String username) {
-        this.username = username;
+        // Initialize ViewModel
+        this.viewModel = new AIViewModel(username);
+        this.viewModel.addListener(this);
+        
+        // Initialize UI
+        initializeUI();
+        
+        // Load initial messages from ViewModel
+        for (ChatMessage message : viewModel.getMessages()) {
+            appendMessage(message.getFormattedMessage());
+        }
+    }
+
+    private void initializeUI() {
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(20, 20, 20, 20));
 
         // Title label
         JLabel titleLabel = new JLabel("AI Assistant", JLabel.LEFT);
         titleLabel.setFont(new Font(titleLabel.getFont().getName(), Font.BOLD, 22));
-        add(titleLabel, BorderLayout.NORTH);
+        
+        // Regenerate advice button panel
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.add(titleLabel, BorderLayout.WEST);
+        
+        regenerateButton = new JButton("Regenerate Financial Advice");
+        regenerateButton.setFocusPainted(false);
+        regenerateButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        regenerateButton.addActionListener(e -> viewModel.regenerateAdvice());
+        
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(regenerateButton);
+        headerPanel.add(buttonPanel, BorderLayout.EAST);
+        
+        add(headerPanel, BorderLayout.NORTH);
 
         // Chat area (scrollable)
         chatArea = new JTextArea();
@@ -40,29 +71,6 @@ public class AIPanel extends JPanel {
         chatScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         chatScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         add(chatScrollPane, BorderLayout.CENTER);
-
-        // Add regenerate advice button panel
-        JPanel regeneratePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton regenerateButton = new JButton("Regenerate Financial Advice");
-        regenerateButton.setFocusPainted(false);
-        regenerateButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        
-        regenerateButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                // Regenerate the shared advice
-                OverviewPanel.sharedAdvice.regenerate();
-                
-                // Notify user in the chat area
-                appendMessage("System: Financial advice has been updated with new AI insights.");
-                
-                // In a real application, we would find and notify the OverviewPanel to update
-                // For a demo this is sufficient
-            }
-        });
-        
-        regeneratePanel.add(regenerateButton);
-        add(regeneratePanel, BorderLayout.NORTH);
 
         // Input panel (text field + send button)
         JPanel inputPanel = new JPanel(new BorderLayout(10, 0));
@@ -79,43 +87,19 @@ public class AIPanel extends JPanel {
 
         add(inputPanel, BorderLayout.SOUTH);
 
-        // Add action listener for the send button
-        sendButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                sendMessage();
-            }
-        });
-
-        // Add action listener for pressing Enter in the input field
-        inputField.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                sendMessage();
-            }
-        });
-        
-        // Add initial welcome message
-        appendMessage("AI: Hello! I can help analyze your finances and provide personalized advice. Ask me anything about your financial data.");
+        // Add action listeners for user interactions
+        sendButton.addActionListener(e -> sendMessage());
+        inputField.addActionListener(e -> sendMessage());
     }
 
     private void sendMessage() {
         String userInput = inputField.getText().trim();
         if (!userInput.isEmpty()) {
-            appendMessage("You: " + userInput);
+            // Clear input field immediately for better UX
             inputField.setText("");
-
-            // Fetch AI response in a separate thread to avoid blocking the UI
-        new Thread(() -> {
-            try {
-                String API_KEY = "sk-fdf26a37926f46ab8d4884c2cd533db8";
-                String response = new getRes().getResponse(API_KEY, userInput);
-                SwingUtilities.invokeLater(() -> appendMessage("AI: " + new getRes().parseAIResponse(response)));
-            } catch (IOException e) {
-                SwingUtilities.invokeLater(() -> appendMessage("Error: " + e.getMessage()));
-            }
-        }).start();
-
+            
+            // Forward to ViewModel
+            viewModel.sendMessage(userInput);
         }
     }
 
@@ -124,4 +108,38 @@ public class AIPanel extends JPanel {
         chatArea.setCaretPosition(chatArea.getDocument().getLength());
     }
 
+    // ViewModel listener implementation
+    @Override
+    public void onMessageAdded(ChatMessage message) {
+        // Ensure UI updates happen on the EDT
+        SwingUtilities.invokeLater(() -> appendMessage(message.getFormattedMessage()));
+    }
+
+    @Override
+    public void onErrorOccurred(String errorMessage) {
+        SwingUtilities.invokeLater(() -> {
+            appendMessage("Error: " + errorMessage);
+            JOptionPane.showMessageDialog(this, errorMessage, "AI Communication Error", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    @Override
+    public void onAdviceUpdated() {
+        SwingUtilities.invokeLater(() -> {
+            JOptionPane.showMessageDialog(
+                this, 
+                "Financial advice has been successfully updated!", 
+                "Advice Updated", 
+                JOptionPane.INFORMATION_MESSAGE
+            );
+        });
+    }
+    
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        // Clean up when panel is removed from UI
+        viewModel.removeListener(this);
+        viewModel.cleanup();
+    }
 }

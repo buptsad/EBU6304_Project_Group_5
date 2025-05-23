@@ -1,10 +1,12 @@
 package com.example.app.ui.pages;
 
-import com.example.app.model.FinanceData;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
 import com.example.app.ui.dashboard.*;
+import com.example.app.viewmodel.pages.DashboardViewModel;
+import com.example.app.viewmodel.pages.DashboardViewModel.DashboardChangeListener;
 import com.formdev.flatlaf.ui.FlatButtonBorder;
+
 import javax.swing.*;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
@@ -12,30 +14,31 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.Enumeration;
 
-public class DashboardPanel extends JPanel implements CurrencyChangeListener {
+public class DashboardPanel extends JPanel implements CurrencyChangeListener, DashboardChangeListener {
+    // ViewModel reference
+    private final DashboardViewModel viewModel;
+    
+    // UI components
     private JScrollPane contentScrollPane;
     private JPanel contentPanel;
-    private JPanel summaryPanel; // Declare summaryPanel as a class-level field
+    private JPanel summaryPanel;
     private CardLayout cardLayout;
     private JButton overviewButton;
     private JButton transactionsButton;
     private JButton budgetsButton;
     private JButton reportsButton;
     
-    // Constants for card layout
-    private static final String OVERVIEW_PANEL = "OVERVIEW";
-    private static final String TRANSACTIONS_PANEL = "TRANSACTIONS";
-    private static final String BUDGETS_PANEL = "BUDGETS";
-    private static final String REPORTS_PANEL = "REPORTS";
-    
     // Colors for button states
     private static final Color SELECTED_COLOR = new Color(70, 130, 180);
     private static final Color HOVER_COLOR = new Color(100, 149, 237);
-    private static final Color DEFAULT_COLOR = UIManager.getColor("Button.background");
     
-    public DashboardPanel() {
+    public DashboardPanel(String username) {
+        // Initialize ViewModel
+        this.viewModel = new DashboardViewModel(username);
+        this.viewModel.addChangeListener(this);
+        
         setLayout(new BorderLayout());
-        setBorder(new EmptyBorder(15, 15, 15, 15)); // Reduced border padding
+        setBorder(new EmptyBorder(15, 15, 15, 15));
         
         // Welcome section
         JLabel welcomeLabel = new JLabel("Welcome to Your Financial Dashboard");
@@ -45,15 +48,16 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
         // Main container panel - use BoxLayout for vertical stacking with flexible sizing
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
-        mainPanel.setBorder(new EmptyBorder(10, 0, 0, 0)); // Reduced top padding
+        mainPanel.setBorder(new EmptyBorder(10, 0, 0, 0));
         
+        // Create summary panel using data from ViewModel
         summaryPanel = createSummaryPanel();
         mainPanel.add(summaryPanel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 10))); // Space between panels
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
         
         // Create a panel to hold the buttons and content panel
-        JPanel contentContainer = new JPanel(new BorderLayout(0, 5)); // Reduced spacing
-
+        JPanel contentContainer = new JPanel(new BorderLayout(0, 5));
+        
         // Sub-navigation buttons panel
         JPanel buttonsPanel = createButtonsPanel();
         contentContainer.add(buttonsPanel, BorderLayout.NORTH);
@@ -62,18 +66,18 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
         
-        // Add sub-panels to the card layout
-        contentPanel.add(new OverviewPanel(), OVERVIEW_PANEL);
-        contentPanel.add(new DashboardTransactionsPanel(), TRANSACTIONS_PANEL);
-        contentPanel.add(new DashboardBudgetsPanel(), BUDGETS_PANEL);
-        contentPanel.add(new DashboardReportsPanel(), REPORTS_PANEL);
+        // Add sub-panels to the card layout - these sub-panels already use MVVM pattern
+        contentPanel.add(new OverviewPanel(username), DashboardViewModel.OVERVIEW_PANEL);
+        contentPanel.add(new DashboardTransactionsPanel(username), DashboardViewModel.TRANSACTIONS_PANEL);
+        contentPanel.add(new DashboardBudgetsPanel(username), DashboardViewModel.BUDGETS_PANEL);
+        contentPanel.add(new DashboardReportsPanel(username), DashboardViewModel.REPORTS_PANEL);
         
         // Wrap contentPanel in a JScrollPane with appropriate scroll policies
         contentScrollPane = new JScrollPane(contentPanel);
         contentScrollPane.setBorder(null);
         contentScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        contentScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED); // Allow horizontal scrolling when needed
-        contentScrollPane.getVerticalScrollBar().setUnitIncrement(16); // Smoother scrolling
+        contentScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        contentScrollPane.getVerticalScrollBar().setUnitIncrement(16);
         
         contentContainer.add(contentScrollPane, BorderLayout.CENTER);
         
@@ -87,9 +91,6 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
         mainScrollPane.getVerticalScrollBar().setUnitIncrement(16);
         
         add(mainScrollPane, BorderLayout.CENTER);
-        
-        // Set default view
-        setActivePanel(OVERVIEW_PANEL);
         
         // Create a ButtonGroup
         ButtonGroup buttonGroup = new ButtonGroup();
@@ -128,30 +129,12 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
                 new EmptyBorder(5, 10, 5, 10)
             ));
         }
+        
+        // Set initial active panel from ViewModel
+        updateActivePanelUI(viewModel.getActivePanel());
+        
+        // Register as currency change listener
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
-    }
-    
-    private void createSummaryPanels() {
-        // 获取父容器
-        JPanel mainPanel = (JPanel) getComponent(0);
-        
-        // 移除旧的summaryPanel
-        Component[] components = mainPanel.getComponents();
-        for (Component component : components) {
-            if (component instanceof JPanel && component.getName() != null && 
-                    component.getName().equals("summaryPanel")) {
-                mainPanel.remove(component);
-                break;
-            }
-        }
-        
-        // 创建新的summaryPanel
-        JPanel summaryPanel = createSummaryPanel();
-        summaryPanel.setName("summaryPanel"); // 设置名称以便识别
-        mainPanel.add(summaryPanel, BorderLayout.NORTH);
-        
-        mainPanel.revalidate();
-        mainPanel.repaint();
     }
     
     private JPanel createSummaryPanel() {
@@ -162,21 +145,18 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
         gbc.weightx = 1.0;
         gbc.insets = new Insets(5, 5, 5, 5);
         
-        // Get financial data
-        FinanceData financeData = new FinanceData();
-        
-        // Create the four summary panels with equal spacing
+        // Create the four summary panels with equal spacing using data from ViewModel
         gbc.gridx = 0;
-        panel.add(createSummaryBox("Total Balance", financeData.getTotalBalance(), new Color(65, 105, 225)), gbc);
+        panel.add(createSummaryBox("Total Balance", viewModel.getTotalBalance(), new Color(65, 105, 225)), gbc);
         
         gbc.gridx = 1;
-        panel.add(createSummaryBox("Total Income", financeData.getTotalIncome(), new Color(46, 139, 87)), gbc);
+        panel.add(createSummaryBox("Total Income", viewModel.getTotalIncome(), new Color(46, 139, 87)), gbc);
         
         gbc.gridx = 2;
-        panel.add(createSummaryBox("Total Expenses", financeData.getTotalExpenses(), new Color(178, 34, 34)), gbc);
+        panel.add(createSummaryBox("Total Expenses", viewModel.getTotalExpenses(), new Color(178, 34, 34)), gbc);
         
         gbc.gridx = 3;
-        panel.add(createSummaryBox("Total Savings", financeData.getTotalSavings(), new Color(218, 165, 32)), gbc);
+        panel.add(createSummaryBox("Total Savings", viewModel.getTotalSavings(), new Color(218, 165, 32)), gbc);
         
         return panel;
     }
@@ -186,7 +166,7 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
         panel.setLayout(new BorderLayout());
         panel.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(accentColor, 1),
-            BorderFactory.createEmptyBorder(10, 10, 10, 10) // Reduced padding
+            BorderFactory.createEmptyBorder(10, 10, 10, 10)
         ));
         
         // Set minimum and preferred sizes to help with scaling
@@ -211,10 +191,10 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
         panel.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 0));
         
         // Create buttons with hover effect
-        overviewButton = createStyledButton("Overview", OVERVIEW_PANEL);
-        transactionsButton = createStyledButton("Transactions", TRANSACTIONS_PANEL);
-        budgetsButton = createStyledButton("Budgets", BUDGETS_PANEL);
-        reportsButton = createStyledButton("Reports", REPORTS_PANEL);
+        overviewButton = createStyledButton("Overview", DashboardViewModel.OVERVIEW_PANEL);
+        transactionsButton = createStyledButton("Transactions", DashboardViewModel.TRANSACTIONS_PANEL);
+        budgetsButton = createStyledButton("Budgets", DashboardViewModel.BUDGETS_PANEL);
+        reportsButton = createStyledButton("Reports", DashboardViewModel.REPORTS_PANEL);
         
         panel.add(overviewButton);
         panel.add(transactionsButton);
@@ -250,13 +230,16 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
             }
         });
         
-        // Add action listener
-        button.addActionListener(e -> setActivePanel(panelName));
+        // Add action listener - use ViewModel to change active panel
+        button.addActionListener(e -> viewModel.setActivePanel(panelName));
         
         return button;
     }
     
-    private void setActivePanel(String panelName) {
+    /**
+     * Update UI to reflect the active panel
+     */
+    private void updateActivePanelUI(String panelName) {
         // Reset all buttons
         overviewButton.setForeground(UIManager.getColor("Button.foreground"));
         transactionsButton.setForeground(UIManager.getColor("Button.foreground"));
@@ -265,16 +248,16 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
         
         // Highlight selected button
         switch (panelName) {
-            case OVERVIEW_PANEL:
+            case DashboardViewModel.OVERVIEW_PANEL:
                 overviewButton.setForeground(SELECTED_COLOR);
                 break;
-            case TRANSACTIONS_PANEL:
+            case DashboardViewModel.TRANSACTIONS_PANEL:
                 transactionsButton.setForeground(SELECTED_COLOR);
                 break;
-            case BUDGETS_PANEL:
+            case DashboardViewModel.BUDGETS_PANEL:
                 budgetsButton.setForeground(SELECTED_COLOR);
                 break;
-            case REPORTS_PANEL:
+            case DashboardViewModel.REPORTS_PANEL:
                 reportsButton.setForeground(SELECTED_COLOR);
                 break;
         }
@@ -282,44 +265,56 @@ public class DashboardPanel extends JPanel implements CurrencyChangeListener {
         // Show selected panel
         cardLayout.show(contentPanel, panelName);
     }
-
+    
+    // Implement listener methods
+    
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
-        // 当货币变化时，重新创建摘要面板
-        try {
-            // 获取摘要面板的父容器
-            Container parent = summaryPanel.getParent();
-            if (parent != null) {
-                // 从父容器中移除旧的摘要面板
-                parent.remove(summaryPanel);
-                
-                // 创建新的摘要面板
-                summaryPanel = createSummaryPanel();
-                
-                // 将新的摘要面板添加到父容器
-                if (parent instanceof JPanel) {
-                    JPanel parentPanel = (JPanel) parent;
-                    if (parentPanel.getLayout() instanceof BorderLayout) {
-                        parentPanel.add(summaryPanel, BorderLayout.NORTH);
-                    } else {
-                        parentPanel.add(summaryPanel);
-                    }
+        // When currency changes, refresh summary panel
+        refreshSummaryPanel();
+    }
+    
+    @Override
+    public void onSummaryDataChanged() {
+        // When summary data changes, refresh summary panel
+        SwingUtilities.invokeLater(this::refreshSummaryPanel);
+    }
+    
+    @Override
+    public void onActivePanelChanged(String panelName) {
+        // When active panel changes, update UI
+        SwingUtilities.invokeLater(() -> updateActivePanelUI(panelName));
+    }
+    
+    /**
+     * Refresh the summary panel with new data
+     */
+    private void refreshSummaryPanel() {
+        Container parent = summaryPanel.getParent();
+        if (parent != null) {
+            parent.remove(summaryPanel);
+            summaryPanel = createSummaryPanel();
+            
+            if (parent instanceof JPanel) {
+                JPanel parentPanel = (JPanel) parent;
+                if (parentPanel.getLayout() instanceof BoxLayout) {
+                    parentPanel.add(summaryPanel, 0);
+                } else {
+                    parentPanel.add(summaryPanel, BorderLayout.NORTH);
                 }
-                
-                // 重新验证和重绘
-                parent.revalidate();
-                parent.repaint();
             }
-        } catch (Exception e) {
-            System.err.println("Error updating summary panels: " + e.getMessage());
-            e.printStackTrace();
+            
+            parent.revalidate();
+            parent.repaint();
         }
     }
     
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // 移除组件时取消监听
+        // Clean up when panel is removed from UI
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
+        viewModel.removeChangeListener(this);
+        viewModel.cleanup();
     }
 }

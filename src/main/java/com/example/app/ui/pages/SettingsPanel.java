@@ -3,21 +3,23 @@ package com.example.app.ui.pages;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
-import com.example.app.model.UserSettings;
-import com.example.app.ui.CurrencyManager;
+import com.example.app.viewmodel.SettingsViewModel;
+import com.example.app.viewmodel.SettingsViewModel.SettingsChangeListener;
+import com.example.app.viewmodel.SettingsViewModel.SettingsChangeType;
 import com.example.app.ui.ThemeManager;
 
 import java.awt.*;
 import java.awt.event.HierarchyEvent;
 import java.awt.event.HierarchyListener;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class SettingsPanel extends JPanel {
+public class SettingsPanel extends JPanel implements SettingsChangeListener {
     private static final Logger LOGGER = Logger.getLogger(SettingsPanel.class.getName());
+    
+    // ViewModel reference
+    private final SettingsViewModel viewModel;
     
     private final CardLayout cardLayout;
     private final JPanel contentPanel;
@@ -43,25 +45,13 @@ public class SettingsPanel extends JPanel {
     private JPasswordField currentPasswordField;
     private JPasswordField newPasswordField;
     private JPasswordField confirmPasswordField;
-    
-    // Reference to user settings
-    private final UserSettings userSettings;
-
-    private String username;
 
     public SettingsPanel(String username) {
-        this.username = username;
-        // Get the user settings instance
-        userSettings = UserSettings.getInstance();
-        LOGGER.log(Level.INFO, "Initializing SettingsPanel with UserSettings");
+        // Initialize ViewModel
+        this.viewModel = new SettingsViewModel(username);
+        this.viewModel.addSettingsChangeListener(this);
         
-        // Log current settings for debugging
-        LOGGER.log(Level.INFO, "Current UserSettings - Name: {0}, Email: {1}, Phone: {2}",
-                new Object[]{userSettings.getName(), userSettings.getEmail(), userSettings.getPhone()});
-        LOGGER.log(Level.INFO, "Current UserSettings - Currency: {0} ({1}), Dark Theme: {2}",
-                new Object[]{userSettings.getCurrencyCode(), userSettings.getCurrencySymbol(), userSettings.isDarkTheme()});
-        LOGGER.log(Level.INFO, "Current UserSettings - Budget Alerts: {0}, Transaction Alerts: {1}",
-                new Object[]{userSettings.isBudgetAlertsEnabled(), userSettings.isTransactionAlertsEnabled()});
+        LOGGER.log(Level.INFO, "Initializing SettingsPanel with ViewModel for user: {0}", username);
         
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 
@@ -176,17 +166,13 @@ public class SettingsPanel extends JPanel {
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
     
-        // Create and populate text fields with current values
-        String name = userSettings.getName();
-        String email = userSettings.getEmail();
-        String phone = userSettings.getPhone();
+        // Create and populate text fields with values from ViewModel
+        nameField = new JTextField(viewModel.getName());
+        emailField = new JTextField(viewModel.getEmail());
+        phoneField = new JTextField(viewModel.getPhone());
         
         LOGGER.log(Level.INFO, "Setting up profile panel with values - Name: {0}, Email: {1}, Phone: {2}", 
-                new Object[]{name, email, phone});
-        
-        nameField = new JTextField(name);
-        emailField = new JTextField(email);
-        phoneField = new JTextField(phone);
+                new Object[]{nameField.getText(), emailField.getText(), phoneField.getText()});
         
         panel.add(createLabeledField("Name:", nameField));
         panel.add(Box.createVerticalStrut(8));
@@ -194,21 +180,13 @@ public class SettingsPanel extends JPanel {
         panel.add(Box.createVerticalStrut(8));
         panel.add(createLabeledField("Phone:", phoneField));
         
-        // Add save button with implementation
+        // Add save button
         panel.add(Box.createVerticalStrut(15));
         JButton submitButton = new JButton("Save Changes");
         submitButton.setAlignmentX(LEFT_ALIGNMENT);
         submitButton.addActionListener(e -> {
-            // Save profile data to settings
-            userSettings.setName(nameField.getText());
-            userSettings.setEmail(emailField.getText());
-            userSettings.setPhone(phoneField.getText());
-            
-            // Save settings to storage
-            userSettings.saveSettings();
-            
-            LOGGER.log(Level.INFO, "Saved profile settings - Name: {0}, Email: {1}, Phone: {2}", 
-                    new Object[]{nameField.getText(), emailField.getText(), phoneField.getText()});
+            // Save profile data via ViewModel
+            viewModel.updateProfile(nameField.getText(), emailField.getText(), phoneField.getText());
             
             JOptionPane.showMessageDialog(
                 this, "Profile information updated successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
@@ -227,12 +205,12 @@ public class SettingsPanel extends JPanel {
         currencyComboBox = new JComboBox<>(new String[]{"USD $", "RMB ¥"});
         currencySymbolField = new JTextField(5);
         
-        // Set values based on settings
-        String storedCurrencyCode = userSettings.getCurrencyCode();
-        String storedCurrencySymbol = userSettings.getCurrencySymbol();
+        // Set values based on ViewModel
+        String storedCurrencyCode = viewModel.getCurrencyCode();
+        String storedCurrencySymbol = viewModel.getCurrencySymbol();
         
         LOGGER.log(Level.INFO, "Setting up preferences panel with values - Currency: {0} ({1}), Dark Theme: {2}", 
-                new Object[]{storedCurrencyCode, storedCurrencySymbol, userSettings.isDarkTheme()});
+                new Object[]{storedCurrencyCode, storedCurrencySymbol, viewModel.isDarkTheme()});
         
         if ("USD".equals(storedCurrencyCode)) {
             currencyComboBox.setSelectedItem("USD $");
@@ -275,8 +253,8 @@ public class SettingsPanel extends JPanel {
         darkThemeRadio = new JRadioButton("Dark Theme");
         lightThemeRadio = new JRadioButton("Light Theme");
         
-        // Set selection based on stored setting
-        boolean isDarkTheme = userSettings.isDarkTheme();
+        // Set selection based on ViewModel
+        boolean isDarkTheme = viewModel.isDarkTheme();
         darkThemeRadio.setSelected(isDarkTheme);
         lightThemeRadio.setSelected(!isDarkTheme);
         
@@ -297,13 +275,10 @@ public class SettingsPanel extends JPanel {
         applyThemeButton.addActionListener(e -> {
             boolean selectDark = darkThemeRadio.isSelected();
             
-            // Save to settings
-            userSettings.setDarkTheme(selectDark);
-            userSettings.saveSettings();
+            // Update theme via ViewModel
+            viewModel.updateTheme(selectDark);
             
-            LOGGER.log(Level.INFO, "Saved theme setting: Dark theme = {0}", selectDark);
-            
-            // Apply theme
+            // Apply theme to UI
             applyTheme(selectDark);
         });
         panel.add(applyThemeButton);
@@ -323,16 +298,8 @@ public class SettingsPanel extends JPanel {
                 code = "RMB";
             }
             
-            // Save to settings
-            userSettings.setCurrencyCode(code);
-            userSettings.setCurrencySymbol(symbol);
-            userSettings.saveSettings();
-            
-            LOGGER.log(Level.INFO, "Saved currency settings - Code: {0}, Symbol: {1}", 
-                    new Object[]{code, symbol});
-            
-            // Update the currency manager
-            CurrencyManager.getInstance().setCurrency(code, symbol);
+            // Update currency via ViewModel
+            viewModel.updateCurrency(code, symbol);
             
             JOptionPane.showMessageDialog(
                 this, "Currency preferences updated successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
@@ -345,9 +312,6 @@ public class SettingsPanel extends JPanel {
     // Apply theme method
     private void applyTheme(boolean darkTheme) {
         try {
-            // Save theme setting in ThemeManager
-            ThemeManager.getInstance().setTheme(darkTheme);
-            
             if (darkTheme) {
                 UIManager.setLookAndFeel(new com.formdev.flatlaf.FlatDarculaLaf());
             } else {
@@ -375,9 +339,9 @@ public class SettingsPanel extends JPanel {
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Create checkboxes and set their states from settings
-        boolean budgetAlertsEnabled = userSettings.isBudgetAlertsEnabled();
-        boolean transactionAlertsEnabled = userSettings.isTransactionAlertsEnabled();
+        // Create checkboxes and set their states from ViewModel
+        boolean budgetAlertsEnabled = viewModel.isBudgetAlertsEnabled();
+        boolean transactionAlertsEnabled = viewModel.isTransactionAlertsEnabled();
         
         LOGGER.log(Level.INFO, "Setting up notifications panel with values - Budget Alerts: {0}, Transaction Alerts: {1}", 
                 new Object[]{budgetAlertsEnabled, transactionAlertsEnabled});
@@ -392,18 +356,16 @@ public class SettingsPanel extends JPanel {
         panel.add(Box.createVerticalStrut(8));
         panel.add(createLabeledField("Transaction Alerts:", transactionAlertsCheckBox));
         
-        // Save button with implementation
+        // Save button
         panel.add(Box.createVerticalStrut(15));
         JButton saveButton = new JButton("Save Preferences");
         saveButton.setAlignmentX(LEFT_ALIGNMENT);
         saveButton.addActionListener(e -> {
-            // Save notification preferences
-            userSettings.setBudgetAlertsEnabled(budgetAlertsCheckBox.isSelected());
-            userSettings.setTransactionAlertsEnabled(transactionAlertsCheckBox.isSelected());
-            userSettings.saveSettings();
-            
-            LOGGER.log(Level.INFO, "Saved notification settings - Budget Alerts: {0}, Transaction Alerts: {1}", 
-                    new Object[]{budgetAlertsCheckBox.isSelected(), transactionAlertsCheckBox.isSelected()});
+            // Save notification preferences via ViewModel
+            viewModel.updateNotifications(
+                budgetAlertsCheckBox.isSelected(), 
+                transactionAlertsCheckBox.isSelected()
+            );
             
             JOptionPane.showMessageDialog(
                 this, "Notification settings saved!", "Success", JOptionPane.INFORMATION_MESSAGE);
@@ -429,7 +391,7 @@ public class SettingsPanel extends JPanel {
         panel.add(Box.createVerticalStrut(8));
         panel.add(createLabeledField("Confirm Password:", confirmPasswordField));
         
-        // Change password button with implementation
+        // Change password button
         panel.add(Box.createVerticalStrut(15));
         JButton changePasswordButton = new JButton("Change Password");
         changePasswordButton.setAlignmentX(LEFT_ALIGNMENT);
@@ -440,7 +402,7 @@ public class SettingsPanel extends JPanel {
                 char[] newPwd = newPasswordField.getPassword();
                 char[] confirmPwd = confirmPasswordField.getPassword();
                 
-                // Validate inputs
+                // Validation messages for the user
                 if (currentPwd.length == 0) {
                     JOptionPane.showMessageDialog(this, "Please enter your current password", 
                                                 "Validation Error", JOptionPane.ERROR_MESSAGE);
@@ -459,35 +421,25 @@ public class SettingsPanel extends JPanel {
                     return;
                 }
                 
-                // Hash current password and verify
-                String currentHash = hashPassword(new String(currentPwd));
-                String storedHash = userSettings.getPasswordHash();
+                // Update password via ViewModel
+                boolean success = viewModel.updatePassword(
+                    new String(currentPwd), 
+                    new String(newPwd), 
+                    new String(confirmPwd)
+                );
                 
-                // For debugging only
-                LOGGER.log(Level.INFO, "Current hash: {0}, Stored hash: {1}", 
-                        new Object[]{currentHash, storedHash});
-                
-                // If there's a stored password and it doesn't match
-                if (storedHash != null && !storedHash.isEmpty() && !storedHash.equals(currentHash)) {
-                    JOptionPane.showMessageDialog(this, "Current password is incorrect", 
-                                                "Authentication Error", JOptionPane.ERROR_MESSAGE);
-                    return;
+                if (success) {
+                    // Clear password fields for security
+                    currentPasswordField.setText("");
+                    newPasswordField.setText("");
+                    confirmPasswordField.setText("");
+                    
+                    JOptionPane.showMessageDialog(this, "Password changed successfully!", 
+                                                "Success", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this, "Failed to change password. Current password may be incorrect.", 
+                                                "Error", JOptionPane.ERROR_MESSAGE);
                 }
-                
-                // Hash and store the new password
-                String newHash = hashPassword(new String(newPwd));
-                userSettings.setPasswordHash(newHash);
-                userSettings.saveSettings();
-                
-                LOGGER.log(Level.INFO, "Password changed successfully");
-                
-                // Clear password fields for security
-                currentPasswordField.setText("");
-                newPasswordField.setText("");
-                confirmPasswordField.setText("");
-                
-                JOptionPane.showMessageDialog(this, "Password changed successfully!", 
-                                            "Success", JOptionPane.INFORMATION_MESSAGE);
                 
             } finally {
                 // Clear password arrays for security
@@ -500,31 +452,50 @@ public class SettingsPanel extends JPanel {
             }
         });
         panel.add(changePasswordButton);
+        
+        // Add reset to defaults button
+        panel.add(Box.createVerticalStrut(20));
+        panel.add(new JSeparator());
+        panel.add(Box.createVerticalStrut(20));
+        
+        JLabel resetLabel = new JLabel("Reset All Settings");
+        resetLabel.setFont(new Font(resetLabel.getFont().getName(), Font.BOLD, 14));
+        resetLabel.setAlignmentX(LEFT_ALIGNMENT);
+        panel.add(resetLabel);
+        panel.add(Box.createVerticalStrut(10));
+        
+        JButton resetButton = new JButton("Reset to Default Values");
+        resetButton.setAlignmentX(LEFT_ALIGNMENT);
+        resetButton.setForeground(Color.RED);
+        resetButton.addActionListener(e -> {
+            int result = JOptionPane.showConfirmDialog(
+                this, 
+                "This will reset all your settings to default values. Are you sure?",
+                "Confirm Reset",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+            );
+            
+            if (result == JOptionPane.YES_OPTION) {
+                // Reset settings via ViewModel
+                viewModel.resetToDefaults();
+                
+                JOptionPane.showMessageDialog(
+                    this, 
+                    "All settings have been reset to defaults.",
+                    "Settings Reset",
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+                
+                // Update UI with default values
+                updateUIFromViewModel();
+            }
+        });
+        panel.add(resetButton);
 
         return panel;
     }
     
-    // Simple password hashing method - for demonstration purposes only
-    private String hashPassword(String password) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(password.getBytes());
-            StringBuilder hexString = new StringBuilder();
-            
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            LOGGER.log(Level.SEVERE, "Failed to hash password", e);
-            // Fallback to simple encoding if SHA-256 is not available
-            return password;
-        }
-    }
-
     private JPanel createLabeledField(String labelText, JComponent field) {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.X_AXIS));
@@ -539,5 +510,85 @@ public class SettingsPanel extends JPanel {
         panel.add(field);
     
         return panel;
+    }
+    
+    // Update UI components when settings change
+    private void updateUIFromViewModel() {
+        // Profile
+        nameField.setText(viewModel.getName());
+        emailField.setText(viewModel.getEmail());
+        phoneField.setText(viewModel.getPhone());
+        
+        // Currency
+        String currencyCode = viewModel.getCurrencyCode();
+        if ("USD".equals(currencyCode)) {
+            currencyComboBox.setSelectedItem("USD $");
+        } else if ("RMB".equals(currencyCode)) {
+            currencyComboBox.setSelectedItem("RMB ¥");
+        }
+        currencySymbolField.setText(viewModel.getCurrencySymbol());
+        
+        // Theme
+        boolean isDarkTheme = viewModel.isDarkTheme();
+        darkThemeRadio.setSelected(isDarkTheme);
+        lightThemeRadio.setSelected(!isDarkTheme);
+        
+        // Notifications
+        budgetAlertsCheckBox.setSelected(viewModel.isBudgetAlertsEnabled());
+        transactionAlertsCheckBox.setSelected(viewModel.isTransactionAlertsEnabled());
+        
+        // Security - only update if needed
+        currentPasswordField.setText("");
+        newPasswordField.setText("");
+        confirmPasswordField.setText("");
+    }
+    
+    // Implement SettingsChangeListener method
+    @Override
+    public void onSettingsChanged(SettingsChangeType changeType) {
+        SwingUtilities.invokeLater(() -> {
+            if (changeType == SettingsChangeType.ALL) {
+                // Update all UI components
+                updateUIFromViewModel();
+            } else {
+                // Update specific components based on change type
+                switch (changeType) {
+                    case PROFILE:
+                        nameField.setText(viewModel.getName());
+                        emailField.setText(viewModel.getEmail());
+                        phoneField.setText(viewModel.getPhone());
+                        break;
+                    case CURRENCY:
+                        String currencyCode = viewModel.getCurrencyCode();
+                        if ("USD".equals(currencyCode)) {
+                            currencyComboBox.setSelectedItem("USD $");
+                        } else if ("RMB".equals(currencyCode)) {
+                            currencyComboBox.setSelectedItem("RMB ¥");
+                        }
+                        currencySymbolField.setText(viewModel.getCurrencySymbol());
+                        break;
+                    case THEME:
+                        boolean isDarkTheme = viewModel.isDarkTheme();
+                        darkThemeRadio.setSelected(isDarkTheme);
+                        lightThemeRadio.setSelected(!isDarkTheme);
+                        break;
+                    case NOTIFICATIONS:
+                        budgetAlertsCheckBox.setSelected(viewModel.isBudgetAlertsEnabled());
+                        transactionAlertsCheckBox.setSelected(viewModel.isTransactionAlertsEnabled());
+                        break;
+                    case SECURITY:
+                        // No UI update needed for security
+                        break;
+                }
+            }
+        });
+    }
+    
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        // Clean up when panel is removed
+        viewModel.removeSettingsChangeListener(this);
+        viewModel.cleanup();
     }
 }

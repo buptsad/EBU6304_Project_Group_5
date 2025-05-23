@@ -17,6 +17,7 @@ public class MainFrame extends JFrame {
     private CardLayout cardLayout;
     private Map<String, JButton> navButtons = new HashMap<>();
     private String currentPage;
+    private String currentUser;
     
     // Page constants
     private static final String DASHBOARD_PAGE = "DASHBOARD";
@@ -31,10 +32,11 @@ public class MainFrame extends JFrame {
     private static final Border SELECTED_BORDER = new MatteBorder(0, 0, 2, 0, SELECTED_COLOR);
     private static final Border DEFAULT_BORDER = new EmptyBorder(0, 0, 2, 0);
     
-    public MainFrame() {
-        setTitle("Finance Manager");
+    public MainFrame(String username) {
+        this.currentUser = username;
+        setTitle("Finance Manager - " + username);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1000, 700);
+        setSize(1360, 900);
         setLocationRelativeTo(null);
         
         JPanel mainPanel = new JPanel(new BorderLayout());
@@ -48,12 +50,12 @@ public class MainFrame extends JFrame {
         contentPanel = new JPanel(cardLayout);
         
         // Add all pages to content panel
-        contentPanel.add(new DashboardPanel(), DASHBOARD_PAGE);
-        contentPanel.add(new TransactionsPanel(), TRANSACTIONS_PAGE);
-        contentPanel.add(new BudgetsPanel(), BUDGETS_PAGE);
-        contentPanel.add(new ReportsPanel(), REPORTS_PAGE);
-        contentPanel.add(new AIPanel(), AI_PAGE);
-        contentPanel.add(new SettingsPanel(), SETTINGS_PAGE);
+        contentPanel.add(new DashboardPanel(username), DASHBOARD_PAGE);
+        contentPanel.add(new TransactionsPanel(username), TRANSACTIONS_PAGE);
+        contentPanel.add(new BudgetsPanel(username), BUDGETS_PAGE);
+        contentPanel.add(new ReportsPanel(username), REPORTS_PAGE);
+        contentPanel.add(new AIPanel(username), AI_PAGE);
+        contentPanel.add(new SettingsPanel(username), SETTINGS_PAGE);
         
         mainPanel.add(contentPanel, BorderLayout.CENTER);
         
@@ -61,6 +63,10 @@ public class MainFrame extends JFrame {
         
         // Show dashboard by default and highlight its button
         setActivePage(DASHBOARD_PAGE);
+    }
+    
+    public String getCurrentUser() {
+        return currentUser;
     }
     
     private JPanel createNavigationBar() {

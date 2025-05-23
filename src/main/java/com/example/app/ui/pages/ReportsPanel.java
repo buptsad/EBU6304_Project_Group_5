@@ -1,74 +1,69 @@
 package com.example.app.ui.pages;
 
+import com.example.app.viewmodel.pages.ReportsViewModel;
+import com.example.app.viewmodel.pages.ReportsViewModel.ReportsChangeListener;
 import com.example.app.model.FinanceData;
 import com.example.app.ui.reports.*;
-import com.example.app.model.CSVDataImporter;
-import com.example.app.model.DataRefreshListener;
-import com.example.app.model.DataRefreshManager;
+import com.example.app.viewmodel.reports.IncomeExpensesReportViewModel;
+import com.example.app.viewmodel.reports.CategoryBreakdownViewModel;
+import com.example.app.viewmodel.reports.TrendReportViewModel;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.List;
 
-public class ReportsPanel extends JPanel implements DataRefreshListener {
-    
-    private final FinanceData financeData = new FinanceData();
+public class ReportsPanel extends JPanel implements ReportsChangeListener {
+    private final ReportsViewModel viewModel;
     private JPanel chartContainer;
     private CardLayout cardLayout;
-    
+
     // Chart panels
     private IncomeExpensesReportPanel incomeExpensesPanel;
     private CategoryBreakdownPanel categoryBreakdownPanel;
     private TrendReportPanel trendReportPanel;
-    
+
     // Constants for card layout
     private static final String INCOME_EXPENSE_PANEL = "INCOME_EXPENSE";
     private static final String CATEGORY_BREAKDOWN_PANEL = "CATEGORY_BREAKDOWN";
     private static final String TREND_PANEL = "TREND";
-    
-    private String username;
+
     public ReportsPanel(String username) {
-        this.username = username;
-        // 导入交易数据
-        loadTransactionData();
-        
+        this.viewModel = new ReportsViewModel(username);
+        this.viewModel.addChangeListener(this);
+
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        
+
         // Top panel with title
         JPanel headerPanel = createHeaderPanel();
         add(headerPanel, BorderLayout.NORTH);
-        
+
         // Control panel for filters
         JPanel controlPanel = createControlPanel();
         add(controlPanel, BorderLayout.WEST);
-        
+
         // Chart container with card layout
         cardLayout = new CardLayout();
         chartContainer = new JPanel(cardLayout);
-        
-        // Initialize chart panels
-        incomeExpensesPanel = new IncomeExpensesReportPanel(financeData);
-        categoryBreakdownPanel = new CategoryBreakdownPanel(financeData);
-        trendReportPanel = new TrendReportPanel(financeData);
-        
-        // Add chart panels to container
+
+        // Create sub-panel ViewModels
+        IncomeExpensesReportViewModel incomeVM = new IncomeExpensesReportViewModel(viewModel.getFinanceData());
+        CategoryBreakdownViewModel categoryVM = new CategoryBreakdownViewModel(viewModel.getFinanceData());
+        TrendReportViewModel trendVM = new TrendReportViewModel(viewModel.getFinanceData());
+
+        // Pass ViewModels to sub-panels
+        incomeExpensesPanel = new IncomeExpensesReportPanel(incomeVM);
+        categoryBreakdownPanel = new CategoryBreakdownPanel(categoryVM);
+        trendReportPanel = new TrendReportPanel(trendVM);
+
         chartContainer.add(incomeExpensesPanel, INCOME_EXPENSE_PANEL);
         chartContainer.add(categoryBreakdownPanel, CATEGORY_BREAKDOWN_PANEL);
         chartContainer.add(trendReportPanel, TREND_PANEL);
-        
-        // Show default panel
+
         cardLayout.show(chartContainer, INCOME_EXPENSE_PANEL);
-        
-        // Add chart container to main panel
+
         JScrollPane scrollPane = new JScrollPane(chartContainer);
         scrollPane.setBorder(null);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(scrollPane, BorderLayout.CENTER);
-        
-        // Register as listener for data refresh events
-        DataRefreshManager.getInstance().addListener(this);
     }
 
     private JPanel createHeaderPanel() {
@@ -114,68 +109,62 @@ public class ReportsPanel extends JPanel implements DataRefreshListener {
         
         panel.add(Box.createVerticalStrut(20));
         
-        // Interval Section (for trend reports)
-        panel.add(createSectionLabel("Data Interval"));
+        // Interval Section
+        JLabel intervalLabel = createSectionLabel("Data Interval");
         String[] intervals = {"Daily", "Weekly", "Fortnightly", "Monthly", "Quarterly", "Yearly"};
         JComboBox<String> intervalsCombo = new JComboBox<>(intervals);
         intervalsCombo.setMaximumSize(new Dimension(220, 30));
         intervalsCombo.setAlignmentX(LEFT_ALIGNMENT);
+        
+        panel.add(intervalLabel);
         panel.add(intervalsCombo);
         
         panel.add(Box.createVerticalStrut(20));
         
-        // Apply button
-        JButton applyButton = new JButton("Apply Filters");
-        applyButton.setAlignmentX(LEFT_ALIGNMENT);
-        applyButton.setMaximumSize(new Dimension(220, 35));
-        panel.add(applyButton);
-        
-        // 添加加载数据按钮
-        JButton loadDataButton = new JButton("加载交易数据");
+        // Load data button (keep this one as it serves a different purpose)
+        JButton loadDataButton = new JButton("Load Data");
         loadDataButton.setAlignmentX(LEFT_ALIGNMENT);
         loadDataButton.setMaximumSize(new Dimension(220, 35));
         panel.add(loadDataButton);
         
-        // Add action listeners
+        // Add action listeners for immediate filter application
         timePeriodsCombo.addActionListener(e -> {
             updateReportTimeRange(timePeriodsCombo.getSelectedItem().toString());
+            refreshActiveChart();
         });
         
         intervalsCombo.addActionListener(e -> {
             updateReportInterval(intervalsCombo.getSelectedItem().toString());
+            refreshActiveChart();
         });
         
         incomeExpenseBtn.addActionListener(e -> {
             if (incomeExpenseBtn.isSelected()) {
                 cardLayout.show(chartContainer, INCOME_EXPENSE_PANEL);
+                intervalLabel.setEnabled(true);
+                intervalsCombo.setEnabled(true);
             }
         });
         
         categoryBreakdownBtn.addActionListener(e -> {
             if (categoryBreakdownBtn.isSelected()) {
                 cardLayout.show(chartContainer, CATEGORY_BREAKDOWN_PANEL);
+                intervalLabel.setEnabled(false);
+                intervalsCombo.setEnabled(false);
             }
         });
         
         trendsBtn.addActionListener(e -> {
             if (trendsBtn.isSelected()) {
                 cardLayout.show(chartContainer, TREND_PANEL);
+                intervalLabel.setEnabled(true);
+                intervalsCombo.setEnabled(true);
             }
         });
         
-        applyButton.addActionListener(e -> {
-            applyFilters(
-                timePeriodsCombo.getSelectedItem().toString(),
-                intervalsCombo.getSelectedItem().toString()
-            );
-        });
-        
         loadDataButton.addActionListener(e -> {
-            loadTransactionData();
-            // 刷新所有图表
-            incomeExpensesPanel.refreshChart();
-            categoryBreakdownPanel.refreshChart();
-            trendReportPanel.refreshChart();
+            viewModel.loadTransactionData();
+            refreshAllCharts();
             JOptionPane.showMessageDialog(this, "交易数据已成功加载", "加载成功", JOptionPane.INFORMATION_MESSAGE);
         });
         
@@ -203,52 +192,52 @@ public class ReportsPanel extends JPanel implements DataRefreshListener {
         trendReportPanel.setTimeRange(timeRange);
     }
     
+    // Update the updateReportInterval method
     private void updateReportInterval(String interval) {
+        // Only update panels that support intervals
+        incomeExpensesPanel.setInterval(interval);
         trendReportPanel.setInterval(interval);
+        // CategoryBreakdownPanel doesn't use intervals
     }
-    
-    private void applyFilters(String timeRange, String interval) {
-        updateReportTimeRange(timeRange);
-        updateReportInterval(interval);
-        
-        // Refresh all panels
+
+    // Add this new method to refresh all charts at once
+    private void refreshAllCharts() {
         incomeExpensesPanel.refreshChart();
         categoryBreakdownPanel.refreshChart();
         trendReportPanel.refreshChart();
     }
-    
-    private void loadTransactionData() {
-        // 读取CSV文件数据 - 使用用户特定的路径
-        String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
-        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
-        
-        // 将数据导入到FinanceData模型中
-        if (!transactions.isEmpty()) {
-            financeData.importTransactions(transactions);
-            System.out.println("成功导入 " + transactions.size() + " 条交易记录");
-        } else {
-            System.err.println("没有交易记录被导入");
+
+    // Add this method to refresh only the currently visible chart
+    private void refreshActiveChart() {
+        Component visibleComponent = null;
+        for (Component comp : chartContainer.getComponents()) {
+            if (comp.isVisible()) {
+                visibleComponent = comp;
+                break;
+            }
         }
-    }
-    
-    @Override
-    public void onDataRefresh(DataRefreshManager.RefreshType type) {
-        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
-            type == DataRefreshManager.RefreshType.ALL) {
-            // Reload transaction data
-            loadTransactionData();
-            
-            // Refresh all charts
+        
+        if (visibleComponent == incomeExpensesPanel) {
             incomeExpensesPanel.refreshChart();
+        } else if (visibleComponent == categoryBreakdownPanel) {
             categoryBreakdownPanel.refreshChart();
+        } else if (visibleComponent == trendReportPanel) {
             trendReportPanel.refreshChart();
         }
     }
-    
+
+    @Override
+    public void onReportsDataChanged() {
+        // Refresh all charts when data changes
+        incomeExpensesPanel.refreshChart();
+        categoryBreakdownPanel.refreshChart();
+        trendReportPanel.refreshChart();
+    }
+
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // Unregister when component is removed from UI
-        DataRefreshManager.getInstance().removeListener(this);
+        viewModel.removeChangeListener(this);
+        viewModel.cleanup();
     }
 }

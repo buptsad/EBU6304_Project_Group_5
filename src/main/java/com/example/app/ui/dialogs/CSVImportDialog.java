@@ -1,6 +1,9 @@
 package com.example.app.ui.dialogs;
 
 import com.example.app.ui.pages.TransactionsPanel;
+import com.example.app.user_data.UserBillStorage;
+import com.example.app.model.FinanceData; // 添加导入
+import com.example.app.ui.pages.AI.classification;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -11,10 +14,13 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class CSVImportDialog extends JDialog {
     private TransactionsPanel parentPanel;
@@ -47,9 +53,15 @@ public class CSVImportDialog extends JDialog {
     private JComboBox<String> templateComboBox;
     private boolean applyingTemplate = false; // Flag to prevent resetting when applying template
     
-    public CSVImportDialog(Window owner, TransactionsPanel parentPanel) {
+    // 添加对FinanceData的引用
+    private FinanceData financeData;
+
+    private static final Logger LOGGER = Logger.getLogger(CSVImportDialog.class.getName());
+    
+    public CSVImportDialog(Window owner, TransactionsPanel parentPanel, FinanceData financeData) {
         super(owner, "Import Transactions from CSV", ModalityType.APPLICATION_MODAL);
         this.parentPanel = parentPanel;
+        this.financeData = financeData; // 保存对FinanceData的引用
         
         setSize(800, 600);
         setLocationRelativeTo(owner);
@@ -78,7 +90,7 @@ public class CSVImportDialog extends JDialog {
         JPanel bottomPanel = createButtonPanel();
         add(bottomPanel, BorderLayout.SOUTH);
     }
-    
+
     private JPanel createFileSelectionPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
@@ -148,13 +160,14 @@ public class CSVImportDialog extends JDialog {
         dateColumnCombo = new JComboBox<>();
         mappingGrid.add(dateColumnCombo);
         
-        // Date format
+        // Date format - 添加更多日期格式选项，包括带斜杠的格式
         mappingGrid.add(new JLabel("Date/Time Format:"));
         dateFormatCombo = new JComboBox<>(new String[] {
-            "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss",
-            "MM/dd/yyyy", "MM/dd/yyyy HH:mm:ss", 
-            "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss",
-            "MM-dd-yyyy", "MM-dd-yyyy HH:mm:ss",
+            "yyyy-MM-dd", "yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss",
+            "yyyy/MM/dd", "yyyy/MM/dd HH:mm", "yyyy/MM/dd HH:mm:ss", 
+            "MM/dd/yyyy", "MM/dd/yyyy HH:mm", "MM/dd/yyyy HH:mm:ss", 
+            "dd/MM/yyyy", "dd/MM/yyyy HH:mm", "dd/MM/yyyy HH:mm:ss",
+            "MM-dd-yyyy", "MM-dd-yyyy HH:mm", "MM-dd-yyyy HH:mm:ss",
             "dd-MM-yyyy", "dd-MM-yyyy HH:mm:ss"
         });
         dateFormatCombo.setEditable(true);
@@ -291,12 +304,119 @@ public class CSVImportDialog extends JDialog {
         JScrollPane scrollPane = new JScrollPane(previewTable);
         panel.add(scrollPane, BorderLayout.CENTER);
         
+        // Add a panel for buttons and record count at the bottom
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        
+        // Add AI categorization button
+        JButton categorizeButton = new JButton("AI Categorize");
+        categorizeButton.setToolTipText("Use AI to automatically categorize transactions");
+        categorizeButton.addActionListener(e -> aiCategorizeTransactions());
+        
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        buttonPanel.add(categorizeButton);
+        bottomPanel.add(buttonPanel, BorderLayout.WEST);
+        
         // Add a label indicating the number of records
         recordCountLabel = new JLabel("0 records found");
         recordCountLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        panel.add(recordCountLabel, BorderLayout.SOUTH);
+        bottomPanel.add(recordCountLabel, BorderLayout.EAST);
+        
+        panel.add(bottomPanel, BorderLayout.SOUTH);
         
         return panel;
+    }
+
+    /**
+     * Uses AI to categorize transactions based on their descriptions
+     * Now with batch processing (20 transactions at a time) to avoid API errors
+     */
+    private void aiCategorizeTransactions() {
+        if (csvData.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                "No transactions to categorize. Please import data first.",
+                "No Data", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // Find the index of the category column in csvHeaders
+        int catColIdx = getSelectedIndex(categoryColumnCombo);
+        if (catColIdx < 0) {
+            JOptionPane.showMessageDialog(this,
+                "Please select a Category column for AI to fill.",
+                "No Category Column", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+        new SwingWorker<List<String>, Integer>() {
+            @Override
+            protected List<String> doInBackground() throws Exception {
+                List<String> allCategories = new ArrayList<>();
+                classification aiService = new classification();
+                String API_KEY = "sk-fdf26a37926f46ab8d4884c2cd533db8";
+                final int BATCH_SIZE = 20;
+                int totalRows = csvData.size();
+
+                for (int batchStart = 0; batchStart < totalRows; batchStart += BATCH_SIZE) {
+                    int batchEnd = Math.min(batchStart + BATCH_SIZE, totalRows);
+                    StringBuilder transactionsForAI = new StringBuilder();
+                    for (int i = batchStart; i < batchEnd; i++) {
+                        List<String> row = csvData.get(i);
+                        // Delete the last column (delete) from the row
+                        row.remove(row.size() - 1);
+                        // Join all column values with commas
+                        transactionsForAI.append(String.join(",", row)).append("\n");
+                    }
+                    String response = aiService.getResponse(API_KEY, transactionsForAI.toString());
+                    String parsedResponse = aiService.parseAIResponse(response);
+                    String[] batchCategories = parsedResponse.split(",");
+                    for (String category : batchCategories) {
+                        allCategories.add(category.trim());
+                    }
+                    publish(batchEnd);
+                    Thread.sleep(100);
+                }
+                return allCategories;
+            }
+
+            @Override
+            protected void process(List<Integer> chunks) {
+                int processed = chunks.get(chunks.size() - 1);
+                recordCountLabel.setText(processed + "/" + csvData.size() + " categorized");
+            }
+
+            @Override
+            protected void done() {
+                setCursor(Cursor.getDefaultCursor());
+                try {
+                    List<String> categories = get();
+                    int rowCount = Math.min(categories.size(), csvData.size());
+                    // Update the category column in csvData
+                    for (int i = 0; i < rowCount; i++) {
+                        csvData.get(i).set(catColIdx, categories.get(i));
+                    }
+                    // Refresh preview table to show new categories
+                    updatePreview();
+
+                    JOptionPane.showMessageDialog(
+                        CSVImportDialog.this,
+                        rowCount + " transactions were categorized by AI.",
+                        "AI Categorization Complete",
+                        JOptionPane.INFORMATION_MESSAGE
+                    );
+                    recordCountLabel.setText(csvData.size() + " records found, showing " +
+                            Math.min(csvData.size(), 10));
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(
+                        CSVImportDialog.this,
+                        "AI categorization failed: " + e.getMessage(),
+                        "AI Error",
+                        JOptionPane.ERROR_MESSAGE
+                    );
+                }
+            }
+        }.execute();
     }
     
     private JPanel createButtonPanel() {
@@ -460,8 +580,7 @@ public class CSVImportDialog extends JDialog {
             String formattedDate = dateStr;
             try {
                 if (!dateStr.isEmpty()) {
-                    LocalDate date = LocalDate.parse(dateStr, formatter);
-                    formattedDate = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    formattedDate = parseDate(dateStr, dateFormat);
                 }
             } catch (DateTimeParseException e) {
                 // Keep original string if parsing fails
@@ -590,8 +709,12 @@ public class CSVImportDialog extends JDialog {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(dateFormat);
         
         List<Object[]> transactions = new ArrayList<>();
+        int skippedRows = 0;
+        StringBuilder errorMessages = new StringBuilder();
         
-        for (List<String> rowData : csvData) {
+        for (int rowIndex = 0; rowIndex < csvData.size(); rowIndex++) {
+            List<String> rowData = csvData.get(rowIndex);
+            
             String dateStr = (dateColIdx >= 0 && dateColIdx < rowData.size()) ? 
                              rowData.get(dateColIdx) : "";
             String description = (descColIdx >= 0 && descColIdx < rowData.size()) ? 
@@ -605,11 +728,19 @@ public class CSVImportDialog extends JDialog {
             String formattedDate = "";
             try {
                 if (!dateStr.isEmpty()) {
-                    LocalDate date = LocalDate.parse(dateStr, formatter);
-                    formattedDate = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    formattedDate = parseDate(dateStr, dateFormat);
+                } else {
+                    errorMessages.append("Row ").append(rowIndex + 1).append(": Empty date field\n");
+                    skippedRows++;
+                    continue;
                 }
             } catch (DateTimeParseException e) {
-                // Skip this row if date parsing fails
+                // 记录错误并跳过解析失败的行
+                errorMessages.append("Row ").append(rowIndex + 1)
+                              .append(": Failed to parse date '").append(dateStr)
+                              .append("' using format '").append(dateFormat).append("' - ")
+                              .append(e.getMessage()).append("\n");
+                skippedRows++;
                 continue;
             }
             
@@ -618,6 +749,11 @@ public class CSVImportDialog extends JDialog {
             try {
                 // Remove any currency symbols and commas
                 String cleanAmount = amountStr.replaceAll("[^\\d.-]", "");
+                if (cleanAmount.isEmpty()) {
+                    errorMessages.append("Row ").append(rowIndex + 1).append(": Empty amount field\n");
+                    skippedRows++;
+                    continue;
+                }
                 amount = Double.parseDouble(cleanAmount);
                 
                 // Apply transaction type if enabled
@@ -631,25 +767,72 @@ public class CSVImportDialog extends JDialog {
                     // Check if this is income based on identifiers
                     else if (matchesAnyIdentifier(typeValue, incomeIdentifiers)) {
                         amount = Math.abs(amount); // Make positive
+                    } else {
+                        // Neither income nor expense identifier matched
+                        errorMessages.append("Row ").append(rowIndex + 1)
+                                  .append(": Could not determine transaction type from '")
+                                  .append(typeValue).append("'\n");
                     }
-                    // If no match, keep as is
                 }
             } catch (NumberFormatException e) {
-                // Skip this row if amount parsing fails
+                // Log error and skip row if amount parsing fails
+                errorMessages.append("Row ").append(rowIndex + 1)
+                              .append(": Failed to parse amount '").append(amountStr).append("'\n");
+                skippedRows++;
                 continue;
             }
             
             // Create transaction row
             Object[] transaction = {formattedDate, description, category, amount, false};
             transactions.add(transaction);
+            LOGGER.log(Level.INFO, "Parsed transaction: {0}", Arrays.toString(transaction));
+
+            /* Jump to here */
         }
+        
+        // Display warning if some rows were skipped
+        if (skippedRows > 0) {
+            String message = "Warning: " + skippedRows + " of " + csvData.size() + 
+                             " rows were skipped due to parsing errors.\n\n";
+            if (errorMessages.length() > 0) {
+                // Limit the number of error messages to avoid huge dialog
+                String errors = errorMessages.toString();
+                if (errors.length() > 500) {
+                    errors = errors.substring(0, 500) + "...\n(more errors not shown)";
+                }
+                message += "Errors:\n" + errors;
+            }
+            
+            JOptionPane.showMessageDialog(this, message, 
+                "Import Warning", JOptionPane.WARNING_MESSAGE);
+        }
+        
+        // Check if we have any transactions to save
+        if (transactions.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "No valid transactions found to import. Please check your CSV data and column mappings.", 
+                "Import Failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        // 使用UserBillStorage保存交易记录
+        boolean saveSuccess = UserBillStorage.addTransactions(transactions);
+        
+        if (!saveSuccess) {
+            JOptionPane.showMessageDialog(this, 
+                "There was an error saving transactions to storage.", 
+                "Save Error", JOptionPane.ERROR_MESSAGE);
+        }
+        
+        // 将导入的交易数据添加到FinanceData中
+        // financeData.importTransactions(transactions);
         
         // Import the transactions into the main panel
         parentPanel.addTransactionsFromCSV(transactions);
         
         // Show success message
         JOptionPane.showMessageDialog(this, 
-            transactions.size() + " transactions imported successfully.", 
+            transactions.size() + " transactions imported successfully and saved to user_bill.csv", 
             "Import Complete", JOptionPane.INFORMATION_MESSAGE);
         
         // Close the dialog
@@ -664,12 +847,12 @@ public class CSVImportDialog extends JDialog {
             switch (templateName) {
                 case "WeChat Pay":
                     // Date settings
-                    dateFormatCombo.setSelectedItem("yyyy-MM-dd HH:mm:ss");
+                    dateFormatCombo.setSelectedItem("yyyy/M/d HH:mm"); // 修改为适应 2025/4/14 12:19 的格式
                     
                     // Column mappings
                     setComboBoxItem(dateColumnCombo, "交易时间");
                     setComboBoxItem(descriptionColumnCombo, "商品");
-                    categoryColumnCombo.setSelectedIndex(0); // Default/empty
+                    setComboBoxItem(categoryColumnCombo, "交易类型");
                     setComboBoxItem(amountColumnCombo, "金额(元)");
                     
                     // Transaction type settings
@@ -722,12 +905,66 @@ public class CSVImportDialog extends JDialog {
         // If no exact match, try to find an item that contains the text
         for (int i = 0; i < comboBox.getItemCount(); i++) {
             String itemText = comboBox.getItemAt(i);
-            if (!itemText.isEmpty() && itemText.toLowerCase().contains(text.toLowerCase())) {
+            if (!itemText.isEmpty() && itemText.contains(text)) {
                 comboBox.setSelectedIndex(i);
                 return;
             }
         }
         
         // If still not found, leave as is
+    }
+
+    private String parseDate(String dateStr, String primaryFormat) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return "";
+        }
+
+        // 尝试使用主要格式解析
+        try {
+            return parseDateWithFormat(dateStr, primaryFormat);
+        } catch (DateTimeParseException e) {
+            // 尝试其他可能的格式
+            String[] formatsToTry = {
+                // 带连字符的格式
+                "yyyy-MM-dd", "yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss",
+                // 带斜杠的格式
+                "yyyy/MM/dd", "yyyy/M/d HH:mm", "yyyy/M/d HH:mm:ss",
+                "yyyy/MM/dd", "yyyy/MM/dd HH:mm", "yyyy/MM/dd HH:mm:ss",
+                // 美式格式
+                "MM/dd/yyyy", "MM/dd/yyyy HH:mm", "MM/dd/yyyy HH:mm:ss",
+                // 欧式格式
+                "dd/MM/yyyy", "dd/MM/yyyy HH:mm", "dd/MM/yyyy HH:mm:ss",
+                // 其他常见格式
+                "yyyy.MM.dd", "dd.MM.yyyy", "MM.dd.yyyy"
+            };
+            
+            for (String format : formatsToTry) {
+                if (format.equals(primaryFormat)) continue; // 已经尝试过的格式跳过
+                
+                try {
+                    return parseDateWithFormat(dateStr, format);
+                } catch (DateTimeParseException ignored) {
+                    // 继续尝试下一个格式
+                }
+            }
+            
+            // 所有格式都失败，抛出原始异常
+            throw e;
+        }
+    }
+
+    private String parseDateWithFormat(String dateStr, String format) throws DateTimeParseException {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
+        LocalDate date;
+        
+        if (format.contains("HH:mm") || format.contains("HH:mm:ss")) {
+            // 如果是日期时间格式，先解析为LocalDateTime再转换为LocalDate
+            date = LocalDateTime.parse(dateStr, formatter).toLocalDate();
+        } else {
+            // 纯日期格式
+            date = LocalDate.parse(dateStr, formatter);
+        }
+        
+        return date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
     }
 }

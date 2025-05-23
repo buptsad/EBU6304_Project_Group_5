@@ -169,8 +169,6 @@ public class UserBillStorage {
      * @return 如果成功则返回true，否则返回false
      */
     public static boolean saveTransactions(List<Object[]> transactions) {
-        classification classify = new classification();
-        String API_KEY = "sk-fdf26a37926f46ab8d4884c2cd533db8";
         try (PrintWriter writer = new PrintWriter(new FileWriter(billFile))) {
             // 写入CSV表头
             writer.println(CSV_HEADER);
@@ -181,75 +179,16 @@ public class UserBillStorage {
                 return true;
             }
             
-            // 分批处理交易记录，每批20条
-            final int BATCH_SIZE = 20;
-            List<String> allCategories = new ArrayList<>();
-            
-            for (int batchStart = 0; batchStart < transactions.size(); batchStart += BATCH_SIZE) {
-                int batchEnd = Math.min(batchStart + BATCH_SIZE, transactions.size());
-                List<Object[]> batchTransactions = transactions.subList(batchStart, batchEnd);
-                
-                // 构建当前批次的交易数据字符串
-                StringBuilder stringTransactions = new StringBuilder();
-                for (Object[] transaction : batchTransactions) {
-                    String dateStr = (String) transaction[0];
-                    String description = escapeCSV((String) transaction[1]);
-                    String category = escapeCSV((String) transaction[2]);
-                    String amount = String.valueOf(transaction[3]);
-                    
-                    stringTransactions.append(dateStr).append(",")
-                                     .append(description).append(",")
-                                     .append(category).append(",")
-                                     .append(amount).append("\r\n");
-                }
-                
-                System.out.println("处理第 " + (batchStart/BATCH_SIZE + 1) + " 批交易记录: " + batchTransactions.size() + " 条");
-                
-                // 调用API进行分类
-                String response = classify.getResponse(API_KEY, stringTransactions.toString());
-                System.out.println("AI Response: " + response);
-                
-                response = new classification().parseAIResponse(response);
-                System.out.println("Parsed AI Response: " + response);
-                
-                // 保存这批次的分类结果
-                String[] batchCategories = response.split(",");
-                for (String category : batchCategories) {
-                    allCategories.add(category);
-                }
-                
-                System.out.println("当前批次分类结果: ");
-                for (String category : batchCategories) {
-                    System.out.print(category + " ");
-                }
-                System.out.println();
-            }
-            
-            // 使用收集到的所有分类写入交易记录
-            String[] categories = allCategories.toArray(new String[0]);
-            if (categories.length == 0) {
-                categories = new String[]{"other"}; // 提供默认值
-            }
-            
-            System.out.println("全部分类结果: ");
-            for (String category : categories) {
-                System.out.print(category + " ");
-            }
-            System.out.println();
-            
-            // 写入每一条交易记录
-            int i = 0;
+            // 写入每一条交易记录，不再进行AI分类
             for (Object[] transaction : transactions) {
                 String dateStr = (String) transaction[0];
                 String description = escapeCSV((String) transaction[1]);
-                // 使用分类结果，循环使用分类数组
-                String category = categories.length > 0 ? 
-                    categories[i % categories.length] : "other";
+                // 直接使用交易记录中的分类，不再调用AI进行分类
+                String category = escapeCSV((String) transaction[2]);
                 double amount = (Double) transaction[3];
                 boolean confirmed = transaction.length > 4 ? (Boolean) transaction[4] : false;
                 
                 writer.println(String.format(CSV_FORMAT, dateStr, description, category, amount, confirmed));
-                i++;
             }
             
             LOGGER.log(Level.INFO, "Successfully saved {0} transactions to: {1}", 
