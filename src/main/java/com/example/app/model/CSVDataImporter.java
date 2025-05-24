@@ -9,28 +9,48 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Utility class for importing financial transaction data from CSV files.
+ * Provides functionality to read, validate, and deduplicate transaction records.
+ */
 public class CSVDataImporter {
+    /**
+     * Private constructor to prevent instantiation of this utility class.
+     * This class only contains static methods and should not be instantiated.
+     */
+    private CSVDataImporter() {
+
+    }
     
+    /**
+     * Imports financial transactions from a CSV file.
+     * The expected CSV format has at least 4 columns: date, description, category, and amount.
+     * This method handles deduplication based on all transaction fields.
+     *
+     * @param filePath path to the CSV file to be imported
+     * @return a list of transaction data as Object arrays, where each array represents
+     *         a transaction with elements [date, description, category, amount]
+     */
     public static List<Object[]> importTransactionsFromCSV(String filePath) {
         List<Object[]> transactions = new ArrayList<>();
-        // 用于去重的集合
+        // Set for deduplication
         Set<String> uniqueTransactions = new HashSet<>();
         
         try (BufferedReader br = Files.newBufferedReader(Paths.get(filePath))) {
-            // 跳过标题行
+            // Skip header line
             String line = br.readLine();
             
-            // 读取数据行
+            // Read data lines
             while ((line = br.readLine()) != null) {
-                // 跳过注释行或空行
+                // Skip comment lines or empty lines
                 if (line.trim().startsWith("//") || line.trim().isEmpty()) {
                     continue;
                 }
                 
-                // 分割CSV行
+                // Split CSV line
                 String[] parts = line.split(",");
                 if (parts.length < 4) {
-                    System.err.println("无效的CSV行: " + line);
+                    System.err.println("Invalid CSV line: " + line);
                     continue;
                 }
                 
@@ -38,29 +58,29 @@ public class CSVDataImporter {
                 String description = parts[1].trim();
                 String category = parts[2].trim();
                 
-                // 处理金额
+                // Process amount
                 double amount;
                 try {
                     amount = Double.parseDouble(parts[3].trim());
                 } catch (NumberFormatException e) {
-                    System.err.println("无效的金额: " + parts[3]);
+                    System.err.println("Invalid amount: " + parts[3]);
                     continue;
                 }
                 
-                // 创建唯一标识，用于去重
+                // Create unique identifier for deduplication
                 String uniqueKey = date + "|" + description + "|" + category + "|" + amount;
                 if (!uniqueTransactions.contains(uniqueKey)) {
-                    // 只有唯一的交易才添加
+                    // Only add unique transactions
                     uniqueTransactions.add(uniqueKey);
                     Object[] transaction = new Object[] {date, description, category, amount};
                     transactions.add(transaction);
                 } else {
-                    System.out.println("跳过重复交易: " + date + " " + description + " " + amount);
+                    System.out.println("Skipping duplicate transaction: " + date + " " + description + " " + amount);
                 }
             }
             
         } catch (IOException e) {
-            System.err.println("读取CSV文件时发生错误: " + e.getMessage());
+            System.err.println("Error reading CSV file: " + e.getMessage());
             e.printStackTrace();
         }
         

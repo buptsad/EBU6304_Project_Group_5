@@ -6,73 +6,93 @@ import java.io.FileOutputStream;
 import java.util.Properties;
 
 /**
- * 管理应用程序主题设置
+ * Manages the application's theme settings (dark or light mode).
+ * <p>
+ * This singleton class loads and saves the theme preference to a configuration file,
+ * and provides methods to get or set the current theme.
+ 
  */
 public class ThemeManager {
+    /** The configuration file name for storing theme settings */
     private static final String CONFIG_FILE = "theme.properties";
+    /** The key used in the properties file for the theme */
     private static final String THEME_KEY = "theme";
+    /** The value representing dark theme */
     private static final String DARK_THEME = "dark";
+    /** The value representing light theme */
     private static final String LIGHT_THEME = "light";
-    
+
+    /** Singleton instance */
     private static ThemeManager instance;
+    /** The current theme value ("dark" or "light") */
     private String currentTheme;
-    
+
+    /**
+     * Private constructor. Loads the theme from the configuration file.
+     */
     private ThemeManager() {
-        // 从配置文件加载主题设置
+        // Load theme setting from configuration file
         loadTheme();
     }
-    
+
+    /**
+     * Gets the singleton instance of ThemeManager.
+     *
+     * @return the ThemeManager instance
+     */
     public static synchronized ThemeManager getInstance() {
         if (instance == null) {
             instance = new ThemeManager();
         }
         return instance;
     }
-    
+
     /**
-     * 获取当前主题
-     * @return true 表示暗色主题，false 表示亮色主题
+     * Checks if the current theme is dark.
+     *
+     * @return true if dark theme, false if light theme
      */
     public boolean isDarkTheme() {
         return DARK_THEME.equals(currentTheme);
     }
-    
+
     /**
-     * 设置主题并保存到配置文件
-     * @param isDark true 表示暗色主题，false 表示亮色主题
+     * Sets the theme and saves it to the configuration file.
+     *
+     * @param isDark true for dark theme, false for light theme
      */
     public void setTheme(boolean isDark) {
         currentTheme = isDark ? DARK_THEME : LIGHT_THEME;
         saveTheme();
     }
-    
+
     /**
-     * 从配置文件加载主题设置
+     * Loads the theme setting from the configuration file.
      */
     private void loadTheme() {
         Properties properties = new Properties();
         File configFile = new File(CONFIG_FILE);
-        
+
         if (configFile.exists()) {
             try (FileInputStream fis = new FileInputStream(configFile)) {
                 properties.load(fis);
                 currentTheme = properties.getProperty(THEME_KEY, DARK_THEME);
             } catch (Exception e) {
                 System.err.println("Error loading theme configuration: " + e.getMessage());
-                currentTheme = DARK_THEME; // 默认为暗色主题
+                currentTheme = DARK_THEME; // Default to dark theme
             }
         } else {
-            currentTheme = DARK_THEME; // 默认为暗色主题
+            currentTheme = DARK_THEME; // Default to dark theme
         }
     }
-    
+
     /**
-     * 保存主题设置到配置文件
+     * Saves the current theme setting to the configuration file.
      */
     private void saveTheme() {
         Properties properties = new Properties();
         properties.setProperty(THEME_KEY, currentTheme);
-        
+
         try (FileOutputStream fos = new FileOutputStream(CONFIG_FILE)) {
             properties.store(fos, "Theme Configuration");
         } catch (Exception e) {

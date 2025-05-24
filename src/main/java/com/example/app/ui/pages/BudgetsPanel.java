@@ -11,13 +11,37 @@ import javax.swing.table.TableCellRenderer;
 import java.awt.*;
 import java.util.*;
 
+/**
+ * A panel for managing user budget allocations and viewing AI-generated budget suggestions.
+ * This component follows the MVVM pattern and interacts with a BudgetViewModel to display
+ * and update budget data.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>Displays a table of user budget categories, allocations, and spending</li>
+ *   <li>Allows editing, adding, and deleting budget categories</li>
+ *   <li>Shows AI-generated budget suggestions and allows applying them</li>
+ *   <li>Visualizes budget usage with progress bars and difference indicators</li>
+ * </ul>
+ 
+ */
 public class BudgetsPanel extends JPanel implements CurrencyChangeListener, BudgetViewModel.BudgetChangeListener {
+    /** The ViewModel providing budget data and business logic */
     private final BudgetViewModel viewModel;
+    /** Panel containing the user's budget table */
     private final JPanel userBudgetsPanel;
+    /** Panel containing the AI suggested budget table */
     private final JPanel aiSuggestedPanel;
-    private Map<String, Double> currentSuggestedBudgets; // Store last generated suggestions
+    /** Stores the last generated AI budget suggestions */
+    private Map<String, Double> currentSuggestedBudgets;
+    /** The current currency symbol */
     private String currencySymbol;
 
+    /**
+     * Constructs a new BudgetsPanel for the specified user.
+     *
+     * @param username the username of the current user
+     */
     public BudgetsPanel(String username) {
         // Initialize ViewModel
         this.viewModel = new BudgetViewModel(username);
@@ -82,7 +106,7 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         userBudgetTable.getColumnModel().getColumn(4).setCellRenderer(new ButtonRenderer());
         userBudgetTable.getColumnModel().getColumn(4).setCellEditor(new ButtonEditor(new JCheckBox()));
         
-        // 添加表格网格线设置
+        // Add table grid line settings
         userBudgetTable.setShowGrid(true);
         userBudgetTable.setGridColor(Color.GRAY);
         userBudgetTable.setIntercellSpacing(new Dimension(1, 1));
@@ -135,7 +159,7 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         // Add custom renderer for difference column
         aiSuggestionsTable.getColumnModel().getColumn(2).setCellRenderer(new DifferenceRenderer());
         
-        // 添加表格网格线设置
+        // Add table grid line settings
         aiSuggestionsTable.setShowGrid(true);
         aiSuggestionsTable.setGridColor(Color.GRAY);
         aiSuggestionsTable.setIntercellSpacing(new Dimension(1, 1)); 
@@ -171,6 +195,11 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
     }
 
+    /**
+     * Creates the overall budget progress panel.
+     *
+     * @return the panel displaying overall budget usage
+     */
     private JPanel createOverallBudgetPanel() {
         JPanel overallPanel = new JPanel(new BorderLayout());
         double overallPercentage = viewModel.getOverallBudgetPercentage();
@@ -185,6 +214,11 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         return overallPanel;
     }
 
+    /**
+     * Updates the user budget table with the latest budget and expense data.
+     *
+     * @param table the JTable to update
+     */
     private void updateUserCategoryTable(JTable table) {
         DefaultTableModel model = (DefaultTableModel) table.getModel();
         model.setRowCount(0); // Clear existing rows
@@ -207,6 +241,11 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
     
+    /**
+     * Updates the AI suggested budget table with the latest suggestions.
+     *
+     * @param table the JTable to update
+     */
     private void updateAISuggestedTable(JTable table) {
         DefaultTableModel model = (DefaultTableModel) table.getModel();
         model.setRowCount(0); // Clear existing rows
@@ -233,6 +272,12 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
     
+    /**
+     * Creates a progress bar with color coding based on percentage value.
+     *
+     * @param percentage the percentage value (0-100)
+     * @return a configured JProgressBar
+     */
     private JProgressBar createProgressBar(double percentage) {
         JProgressBar progressBar = new JProgressBar(0, 100);
         progressBar.setValue((int) percentage);
@@ -250,6 +295,9 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         return progressBar;
     }
     
+    /**
+     * Opens a dialog to add a new budget category and updates the model if confirmed.
+     */
     private void addNewCategory() {
         BudgetDialog dialog = new BudgetDialog(SwingUtilities.getWindowAncestor(this), "Add Category", "", 0.0);
         if (dialog.showDialog()) {
@@ -266,6 +314,11 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
     
+    /**
+     * Opens a dialog to edit a budget category and updates the model if confirmed.
+     *
+     * @param category the name of the category to edit
+     */
     private void editCategory(String category) {
         double currentBudget = viewModel.getCategoryBudget(category);
         BudgetDialog dialog = new BudgetDialog(
@@ -287,6 +340,11 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
     
+    /**
+     * Shows a confirmation dialog and deletes a budget category if confirmed.
+     *
+     * @param category the name of the category to delete
+     */
     private void deleteCategory(String category) {
         int result = JOptionPane.showConfirmDialog(
                 this,
@@ -307,6 +365,11 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
     
+    /**
+     * Generates new AI budget suggestions and updates the suggestions table.
+     *
+     * @param aiTable the JTable to update with new suggestions
+     */
     private void shuffleAISuggestions(JTable aiTable) {
         // Generate new suggestions through view model
         currentSuggestedBudgets = viewModel.generateSuggestedBudgets();
@@ -318,6 +381,10 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
                 JOptionPane.INFORMATION_MESSAGE);
     }
     
+    /**
+     * Applies the current AI suggested budgets to the user's budget allocation.
+     * Shows a confirmation dialog before applying.
+     */
     private void applyAISuggestions() {
         int result = JOptionPane.showConfirmDialog(
                 this,
@@ -338,6 +405,13 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
 
+    /**
+     * Called when the application currency changes.
+     * Updates all tables to use the new currency symbol.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
+     */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
         this.currencySymbol = currencySymbol;
@@ -346,6 +420,10 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         updateAISuggestedTable((JTable)((JScrollPane)aiSuggestedPanel.getComponent(0)).getViewport().getView());
     }
 
+    /**
+     * Called when budget data changes in the view model.
+     * Updates all tables to reflect the latest data.
+     */
     @Override
     public void onBudgetDataChanged() {
         // Update UI when view model notifies of data changes
@@ -353,6 +431,10 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         updateAISuggestedTable((JTable)((JScrollPane)aiSuggestedPanel.getComponent(0)).getViewport().getView());
     }
 
+    /**
+     * Called when this panel is removed from its container.
+     * Cleans up listeners and resources.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();
@@ -364,7 +446,9 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
     
     // Custom renderer classes
     
-    // Progress bar renderer for usage column
+    /**
+     * Progress bar renderer for the usage column in the budget table.
+     */
     class ProgressBarRenderer extends JProgressBar implements TableCellRenderer {
         public ProgressBarRenderer() {
             super(0, 100);
@@ -392,7 +476,9 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
 
-    // Button renderer for actions column
+    /**
+     * Button renderer for the actions column in the budget table.
+     */
     class ButtonRenderer extends JPanel implements TableCellRenderer {
         private JButton editButton;
         private JButton deleteButton;
@@ -413,7 +499,9 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
 
-    // Button editor for actions column
+    /**
+     * Button editor for handling edit and delete actions in the budget table.
+     */
     class ButtonEditor extends DefaultCellEditor {
         protected JPanel panel;
         protected JButton editButton;
@@ -456,7 +544,10 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
         }
     }
     
-    // Difference renderer for AI suggestions
+    /**
+     * Renderer for the difference column in the AI suggestions table.
+     * Displays the difference with color coding and formatting.
+     */
     class DifferenceRenderer extends JLabel implements TableCellRenderer {
         public DifferenceRenderer() {
             setOpaque(true);
@@ -490,6 +581,14 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Budg
             
             return this;
         }
+    }
+
+    /**
+     * Returns the ViewModel associated with this panel.
+     * @return the BudgetViewModel instance
+     */
+    BudgetViewModel getViewModel() {
+        return viewModel;
     }
 }
 

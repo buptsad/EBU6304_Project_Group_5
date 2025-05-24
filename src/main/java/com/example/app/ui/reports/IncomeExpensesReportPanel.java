@@ -18,15 +18,36 @@ import java.awt.*;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.*;
-import java.util.List; // Add this import to resolve ambiguity
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
+/**
+ * A panel that displays a time series chart comparing income and expenses.
+ * This panel listens for currency and data changes and updates the chart accordingly.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>Time series chart visualization of income, expenses, and net difference</li>
+ *   <li>Dynamic currency symbol in axis label</li>
+ *   <li>Supports time range selection for filtering data</li>
+ *   <li>Listens to ViewModel and currency changes</li>
+ * </ul>
+ 
+ */
 public class IncomeExpensesReportPanel extends JPanel implements CurrencyChangeListener, ChartDataChangeListener {
+    /** The ViewModel providing income and expenses data */
     private final IncomeExpensesReportViewModel viewModel;
+    /** The chart panel displaying the time series chart */
     private ChartPanel chartPanel;
+    /** The current time range for the report */
     private String timeRange = "Last 30 days";
-    private String interval = "Daily"; // Add interval support
 
+    /**
+     * Constructs a new IncomeExpensesReportPanel with the given ViewModel.
+     *
+     * @param viewModel the ViewModel for income and expenses data
+     */
     public IncomeExpensesReportPanel(IncomeExpensesReportViewModel viewModel) {
         this.viewModel = viewModel;
         this.viewModel.addChangeListener(this);
@@ -42,6 +63,11 @@ public class IncomeExpensesReportPanel extends JPanel implements CurrencyChangeL
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
     }
 
+    /**
+     * Creates the time series chart for income and expenses.
+     *
+     * @return the JFreeChart instance
+     */
     private JFreeChart createChart() {
         XYDataset dataset = createDataset();
         String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
@@ -67,6 +93,11 @@ public class IncomeExpensesReportPanel extends JPanel implements CurrencyChangeL
         return chart;
     }
 
+    /**
+     * Creates the dataset for the time series chart using income and expenses data.
+     *
+     * @return the XYDataset for the chart
+     */
     private XYDataset createDataset() {
         TimeSeries incomeSeries = new TimeSeries("Income");
         TimeSeries expensesSeries = new TimeSeries("Expenses");
@@ -79,48 +110,17 @@ public class IncomeExpensesReportPanel extends JPanel implements CurrencyChangeL
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = getStartDateFromRange(timeRange);
 
-        // Group data based on the selected interval
-        Map<RegularTimePeriod, Double> groupedIncomes = new HashMap<>();
-        Map<RegularTimePeriod, Double> groupedExpenses = new HashMap<>();
+        for (LocalDate date : dates) {
+            if (date.isAfter(startDate.minusDays(1)) && date.isBefore(endDate.plusDays(1))) {
+                Date utilDate = Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                Day day = new Day(utilDate);
 
-        // Process all dates in the range
-        LocalDate currentDate = startDate;
-        while (!currentDate.isAfter(endDate)) {
-            Date utilDate = Date.from(currentDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
-            RegularTimePeriod period = getTimePeriod(utilDate);
-            
-            // Initialize period if not exists
-            groupedIncomes.putIfAbsent(period, 0.0);
-            groupedExpenses.putIfAbsent(period, 0.0);
-            
-            // Add actual data if available
-            Double income = incomes.get(currentDate);
-            Double expense = expenses.get(currentDate);
-            
-            if (income != null) {
-                groupedIncomes.put(period, groupedIncomes.get(period) + income);
-            }
-            
-            if (expense != null) {
-                groupedExpenses.put(period, groupedExpenses.get(period) + expense);
-            }
-            
-            currentDate = currentDate.plusDays(1);
-        }
+                Double income = incomes.get(date);
+                Double expense = expenses.get(date);
 
-        // Add grouped data to series
-        for (RegularTimePeriod period : getSortedPeriods(groupedIncomes.keySet())) {
-            Double income = groupedIncomes.get(period);
-            Double expense = groupedExpenses.get(period);
-            
-            if (income != null && income > 0) {
-                incomeSeries.add(period, income);
-            }
-            if (expense != null && expense > 0) {
-                expensesSeries.add(period, expense);
-            }
-            if (income != null && expense != null) {
-                netSeries.add(period, income - expense);
+                if (income != null) incomeSeries.add(day, income);
+                if (expense != null) expensesSeries.add(day, expense);
+                if (income != null && expense != null) netSeries.add(day, income - expense);
             }
         }
 
@@ -132,49 +132,30 @@ public class IncomeExpensesReportPanel extends JPanel implements CurrencyChangeL
         return dataset;
     }
 
-    private List<RegularTimePeriod> getSortedPeriods(Set<RegularTimePeriod> periods) {
-        List<RegularTimePeriod> sortedPeriods = new ArrayList<>(periods);
-        Collections.sort(sortedPeriods);
-        return sortedPeriods;
-    }
-
-    private RegularTimePeriod getTimePeriod(Date date) {
-        switch (interval) {
-            case "Daily":
-                return new Day(date);
-            case "Weekly":
-                return new Week(date);
-            case "Fortnightly":
-                Week week = new Week(date);
-                // Group weeks into pairs (every 2 weeks)
-                int fortnightNumber = (week.getWeek() - 1) / 2;
-                return new Week(fortnightNumber * 2 + 1, week.getYear());
-            case "Monthly":
-                return new Month(date);
-            case "Quarterly":
-                return new Quarter(date);
-            case "Yearly":
-                return new Year(date);
-            default:
-                return new Day(date);
-        }
-    }
-
+    /**
+     * Sets the time range for the report and updates the chart.
+     *
+     * @param timeRange the time range to display
+     */
     public void setTimeRange(String timeRange) {
         this.timeRange = timeRange;
     }
 
-    // Add interval setter
-    public void setInterval(String interval) {
-        this.interval = interval;
-    }
-
+    /**
+     * Refreshes the chart with the latest data and settings.
+     */
     public void refreshChart() {
         JFreeChart chart = createChart();
         chartPanel.setChart(chart);
         chartPanel.repaint();
     }
 
+    /**
+     * Returns the start date based on the selected time range.
+     *
+     * @param range the time range string
+     * @return the start LocalDate
+     */
     private LocalDate getStartDateFromRange(String range) {
         LocalDate today = LocalDate.now();
         switch (range) {
@@ -188,16 +169,31 @@ public class IncomeExpensesReportPanel extends JPanel implements CurrencyChangeL
         }
     }
 
+    /**
+     * Called when the application currency changes.
+     * Refreshes the chart to update currency symbols.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
+     */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
         refreshChart();
     }
 
+    /**
+     * Called when the chart data changes in the ViewModel.
+     * Refreshes the chart.
+     */
     @Override
     public void onChartDataChanged() {
         SwingUtilities.invokeLater(this::refreshChart);
     }
 
+    /**
+     * Called when this panel is removed from its container.
+     * Cleans up listeners and resources.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();

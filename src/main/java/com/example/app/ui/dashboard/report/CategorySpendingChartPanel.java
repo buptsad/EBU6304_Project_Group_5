@@ -19,11 +19,28 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.Map;
 
+/**
+ * A panel that displays a bar chart comparing budget allocations and actual spending by category.
+ * This component observes both currency changes and chart data changes to keep the visualization current.
+ * <p>
+ * The chart displays two series:
+ * <ul>
+ *   <li>Budget - The allocated budget amount for each spending category</li>
+ *   <li>Actual - The actual amount spent in each category</li>
+ * </ul>
+ 
+ */
 public class CategorySpendingChartPanel extends JPanel implements CurrencyChangeListener, ChartDataChangeListener {
-    
+    /** ViewModel that provides data for the chart */
     private final CategorySpendingChartViewModel viewModel;
+    /** Chart panel for displaying the spending chart */
     private ChartPanel chartPanel;
-    
+
+    /**
+     * Constructs a new CategorySpendingChartPanel with the specified view model.
+     *
+     * @param viewModel the view model providing the chart data
+     */
     public CategorySpendingChartPanel(CategorySpendingChartViewModel viewModel) {
         this.viewModel = viewModel;
         this.viewModel.addChangeListener(this);
@@ -45,6 +62,11 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
     }
     
+    /**
+     * Creates a JFreeChart bar chart displaying budget and actual spending by category.
+     * 
+     * @return a configured JFreeChart instance
+     */
     private JFreeChart createChart() {
         // Create dataset for the chart
         DefaultCategoryDataset dataset = createDataset();
@@ -91,6 +113,11 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
         return chart;
     }
     
+    /**
+     * Creates a dataset containing budget and expense data for each category.
+     *
+     * @return a populated DefaultCategoryDataset
+     */
     private DefaultCategoryDataset createDataset() {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         
@@ -110,12 +137,23 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
         return dataset;
     }
 
+    /**
+     * Called when the application currency changes.
+     * Updates the chart to reflect the new currency.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
+     */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
         // Refresh chart when currency changes
         refreshChart();
     }
     
+    /**
+     * Called when the chart data changes in the ViewModel.
+     * Updates the chart to reflect the new data.
+     */
     @Override
     public void onChartDataChanged() {
         // Called by ViewModel when data changes
@@ -123,7 +161,8 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
     }
     
     /**
-     * Refresh the chart with current data
+     * Refreshes the chart with current data from the view model.
+     * Creates a new chart and updates the chart panel.
      */
     public void refreshChart() {
         JFreeChart chart = createChart();
@@ -131,6 +170,10 @@ public class CategorySpendingChartPanel extends JPanel implements CurrencyChange
         chartPanel.repaint();
     }
     
+    /**
+     * Called when this panel is removed from its container.
+     * Performs necessary cleanup by removing listeners and cleaning up the view model.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();
