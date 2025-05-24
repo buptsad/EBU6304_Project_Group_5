@@ -14,18 +14,42 @@ import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * Classification utility for financial transactions using DeepSeek AI API.
+ * Categorizes transactions into predefined categories: Gift, Entertainment, Service, Shopping, Other, and Food.
+ */
 public class classification {
+
     /**
-     * 请求API地址
+     * private constructor to prevent instantiation of this utility class.
+     * This class only contains static methods and should not be instantiated.
+     */
+    public classification() {
+        // Prevent instantiation
+    }
+
+    /**
+     * DeepSeek API endpoint URL
      */
     private static final String API_URL = "https://api.deepseek.com/v1/chat/completions";
+    
     /**
-     * 你在DeepSeek官网申请的API KEY，注意不要泄露给他人！
+     * DeepSeek API Key - Keep this private and secure!
      */
     private static String API_KEY = "sk-fdf26a37926f46ab8d4884c2cd533db8";
+    
     private final RestTemplate restTemplate = new RestTemplate();
+    
+    /**
+     * Sends a request to the DeepSeek API to classify transaction data.
+     * 
+     * @param apiKey The DeepSeek API key for authentication
+     * @param prompt The transaction data to be classified
+     * @return The raw JSON response from the DeepSeek API
+     * @throws IOException If there is an error in the API communication
+     */
     public String getResponse(String apiKey, String prompt) throws IOException {
-        // 构建请求体
+        // Build request body
         
         prompt = "请你根据以下的账单信息，将这些交易中的每一笔交易归于{Gift,Entertainment,Service,Shopping,Other,Food}中的一类。示例输入如下：2025-04-14,风味餐厅,商户消费,-15.00\r\n2025-04-14,微信转账,红包,12.00\r\n\r\n示例输出字符串如下，类别中间以逗号隔开：Food,Other，如果不属于任何类别归类为Other.除此之外不允许包含其它任何的内容" + prompt;
         DeepseekRequest.Message message = DeepseekRequest.Message.builder()
@@ -37,26 +61,33 @@ public class classification {
                 .messages(Collections.singletonList(message))
                 .build();
 
-        // 将请求体序列化为 JSON 字符串
+        // Serialize request body to JSON string
         String jsonBody = new ObjectMapper().writeValueAsString(requestBody);
 
-        // 创建 HTTP 请求头
+        // Create HTTP headers
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey); // 等效于 headers.add("Authorization", "Bearer " + apiKey)
+        headers.setBearerAuth(apiKey); // Equivalent to headers.add("Authorization", "Bearer " + apiKey)
 
-        // 构建 HttpEntity 对象
+        // Build HttpEntity object
         HttpEntity<String> httpEntity = new HttpEntity<>(jsonBody, headers);
 
-        // 发送 HTTP POST 请求并获取响应
+        // Send HTTP POST request and get response
         ResponseEntity<String> responseEntity = restTemplate.postForEntity(API_URL, httpEntity, String.class);
 
-        // 判断响应状态码和响应体是否有效
+        // Check response status code and response body validity
         if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
             return responseEntity.getBody();
         }
         throw new IOException("Unexpected status code" );
     }
+    
+    /**
+     * Extracts the content from the DeepSeek API JSON response.
+     * 
+     * @param jsonResponse The raw JSON response from the DeepSeek API
+     * @return The extracted content or an error message if parsing fails
+     */
     public String parseAIResponse(String jsonResponse) {
         try {
             JSONObject root = new JSONObject(jsonResponse);
@@ -72,7 +103,11 @@ public class classification {
         return "Error: Unable to parse AI response.";
     }
 
-
+    /**
+     * Main method for testing the classification functionality.
+     * 
+     * @param args Command line arguments (not used)
+     */
     public static void main(String[] args) {
         String question = "2025-04-14,商户消费,商户消费,-15.00,false";
         try {

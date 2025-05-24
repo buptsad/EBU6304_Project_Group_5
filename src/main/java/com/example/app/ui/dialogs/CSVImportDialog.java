@@ -2,8 +2,7 @@ package com.example.app.ui.dialogs;
 
 import com.example.app.ui.pages.TransactionsPanel;
 import com.example.app.user_data.UserBillStorage;
-import com.example.app.model.FinanceData; // 添加导入
-import com.example.app.ui.pages.AI.classification;
+import com.example.app.model.FinanceData; // Import added
 
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -22,46 +21,92 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * A dialog for importing financial transactions from CSV files.
+ * This dialog allows users to map CSV columns to transaction fields,
+ * preview the data, and import it into the application.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>CSV file selection</li>
+ *   <li>Column mapping</li>
+ *   <li>Template selection for common CSV formats</li>
+ *   <li>Date format specification</li>
+ *   <li>Transaction type identification</li>
+ *   <li>Data preview</li>
+ *   <li>Error handling</li>
+ * </ul>
+ 
+ */
 public class CSVImportDialog extends JDialog {
+    /** Reference to the parent transactions panel */
     private TransactionsPanel parentPanel;
+    
+    /** Table for displaying transaction previews */
     private JTable previewTable;
+    
+    /** Table model for the preview table */
     private DefaultTableModel previewTableModel;
+    
+    /** List of CSV column headers */
     private List<String> csvHeaders;
+    
+    /** List of CSV data rows */
     private List<List<String>> csvData;
     
-    // Combo boxes for mapping CSV columns to transaction attributes
+    /** Combo box for selecting the date column */
     private JComboBox<String> dateColumnCombo;
-    private JComboBox<String> descriptionColumnCombo;
-    private JComboBox<String> categoryColumnCombo;
-    private JComboBox<String> amountColumnCombo;
-    private JComboBox<String> typeColumnCombo; // New: Transaction type column
     
-    // Text fields for identifying income vs expense
+    /** Combo box for selecting the description column */
+    private JComboBox<String> descriptionColumnCombo;
+    
+    /** Combo box for selecting the category column */
+    private JComboBox<String> categoryColumnCombo;
+    
+    /** Combo box for selecting the amount column */
+    private JComboBox<String> amountColumnCombo;
+    
+    /** Combo box for selecting the transaction type column */
+    private JComboBox<String> typeColumnCombo;
+    
+    /** Text field for specifying income identifiers */
     private JTextField incomeIdentifierField;
+    
+    /** Text field for specifying expense identifiers */
     private JTextField expenseIdentifierField;
     
-    // Checkbox to use transaction type column
+    /** Checkbox to enable transaction type column usage */
     private JCheckBox useTypeColumnCheckBox;
     
-    // Date format for parsing
+    /** Combo box for selecting the date format */
     private JComboBox<String> dateFormatCombo;
     
-    // Store a reference to the record count label
+    /** Label displaying the number of records found */
     private JLabel recordCountLabel;
 
-    // Add these fields to the class
+    /** Combo box for selecting CSV templates */
     private JComboBox<String> templateComboBox;
-    private boolean applyingTemplate = false; // Flag to prevent resetting when applying template
     
-    // 添加对FinanceData的引用
+    /** Flag to prevent template reset when applying a template */
+    private boolean applyingTemplate = false;
+    
+    /** Reference to the finance data model */
     private FinanceData financeData;
 
+    /** Logger for this class */
     private static final Logger LOGGER = Logger.getLogger(CSVImportDialog.class.getName());
     
+    /**
+     * Creates a new CSV import dialog.
+     *
+     * @param owner the owner window of this dialog
+     * @param parentPanel the parent transactions panel to receive imported data
+     * @param financeData the finance data model to update with imported transactions
+     */
     public CSVImportDialog(Window owner, TransactionsPanel parentPanel, FinanceData financeData) {
         super(owner, "Import Transactions from CSV", ModalityType.APPLICATION_MODAL);
         this.parentPanel = parentPanel;
-        this.financeData = financeData; // 保存对FinanceData的引用
+        this.financeData = financeData; // Save reference to FinanceData
         
         setSize(800, 600);
         setLocationRelativeTo(owner);
@@ -91,6 +136,11 @@ public class CSVImportDialog extends JDialog {
         add(bottomPanel, BorderLayout.SOUTH);
     }
 
+    /**
+     * Creates the file selection panel with browse button.
+     *
+     * @return the file selection panel
+     */
     private JPanel createFileSelectionPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
@@ -119,7 +169,11 @@ public class CSVImportDialog extends JDialog {
         return panel;
     }
     
-    // Modify the createMappingPanel method to add template selection
+    /**
+     * Creates the column mapping panel with template selection.
+     *
+     * @return the column mapping panel
+     */
     private JPanel createMappingPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createTitledBorder("Column Mapping"));
@@ -160,7 +214,7 @@ public class CSVImportDialog extends JDialog {
         dateColumnCombo = new JComboBox<>();
         mappingGrid.add(dateColumnCombo);
         
-        // Date format - 添加更多日期格式选项，包括带斜杠的格式
+        // Date format - Add more date format options including formats with slashes
         mappingGrid.add(new JLabel("Date/Time Format:"));
         dateFormatCombo = new JComboBox<>(new String[] {
             "yyyy-MM-dd", "yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss",
@@ -276,6 +330,11 @@ public class CSVImportDialog extends JDialog {
         return panel;
     }
     
+    /**
+     * Creates the transaction preview panel with a table display.
+     *
+     * @return the preview panel
+     */
     private JPanel createPreviewPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createTitledBorder("Transaction Preview"));
@@ -304,121 +363,19 @@ public class CSVImportDialog extends JDialog {
         JScrollPane scrollPane = new JScrollPane(previewTable);
         panel.add(scrollPane, BorderLayout.CENTER);
         
-        // Add a panel for buttons and record count at the bottom
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        
-        // Add AI categorization button
-        JButton categorizeButton = new JButton("AI Categorize");
-        categorizeButton.setToolTipText("Use AI to automatically categorize transactions");
-        categorizeButton.addActionListener(e -> aiCategorizeTransactions());
-        
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        buttonPanel.add(categorizeButton);
-        bottomPanel.add(buttonPanel, BorderLayout.WEST);
-        
         // Add a label indicating the number of records
         recordCountLabel = new JLabel("0 records found");
         recordCountLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        bottomPanel.add(recordCountLabel, BorderLayout.EAST);
-        
-        panel.add(bottomPanel, BorderLayout.SOUTH);
+        panel.add(recordCountLabel, BorderLayout.SOUTH);
         
         return panel;
     }
-
-    /**
-     * Uses AI to categorize transactions based on their descriptions
-     * Now with batch processing (20 transactions at a time) to avoid API errors
-     */
-    private void aiCategorizeTransactions() {
-        if (csvData.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                "No transactions to categorize. Please import data first.",
-                "No Data", JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-
-        // Find the index of the category column in csvHeaders
-        int catColIdx = getSelectedIndex(categoryColumnCombo);
-        if (catColIdx < 0) {
-            JOptionPane.showMessageDialog(this,
-                "Please select a Category column for AI to fill.",
-                "No Category Column", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-
-        new SwingWorker<List<String>, Integer>() {
-            @Override
-            protected List<String> doInBackground() throws Exception {
-                List<String> allCategories = new ArrayList<>();
-                classification aiService = new classification();
-                String API_KEY = "sk-fdf26a37926f46ab8d4884c2cd533db8";
-                final int BATCH_SIZE = 20;
-                int totalRows = csvData.size();
-
-                for (int batchStart = 0; batchStart < totalRows; batchStart += BATCH_SIZE) {
-                    int batchEnd = Math.min(batchStart + BATCH_SIZE, totalRows);
-                    StringBuilder transactionsForAI = new StringBuilder();
-                    for (int i = batchStart; i < batchEnd; i++) {
-                        List<String> row = csvData.get(i);
-                        // Delete the last column (delete) from the row
-                        row.remove(row.size() - 1);
-                        // Join all column values with commas
-                        transactionsForAI.append(String.join(",", row)).append("\n");
-                    }
-                    String response = aiService.getResponse(API_KEY, transactionsForAI.toString());
-                    String parsedResponse = aiService.parseAIResponse(response);
-                    String[] batchCategories = parsedResponse.split(",");
-                    for (String category : batchCategories) {
-                        allCategories.add(category.trim());
-                    }
-                    publish(batchEnd);
-                    Thread.sleep(100);
-                }
-                return allCategories;
-            }
-
-            @Override
-            protected void process(List<Integer> chunks) {
-                int processed = chunks.get(chunks.size() - 1);
-                recordCountLabel.setText(processed + "/" + csvData.size() + " categorized");
-            }
-
-            @Override
-            protected void done() {
-                setCursor(Cursor.getDefaultCursor());
-                try {
-                    List<String> categories = get();
-                    int rowCount = Math.min(categories.size(), csvData.size());
-                    // Update the category column in csvData
-                    for (int i = 0; i < rowCount; i++) {
-                        csvData.get(i).set(catColIdx, categories.get(i));
-                    }
-                    // Refresh preview table to show new categories
-                    updatePreview();
-
-                    JOptionPane.showMessageDialog(
-                        CSVImportDialog.this,
-                        rowCount + " transactions were categorized by AI.",
-                        "AI Categorization Complete",
-                        JOptionPane.INFORMATION_MESSAGE
-                    );
-                    recordCountLabel.setText(csvData.size() + " records found, showing " +
-                            Math.min(csvData.size(), 10));
-                } catch (Exception e) {
-                    JOptionPane.showMessageDialog(
-                        CSVImportDialog.this,
-                        "AI categorization failed: " + e.getMessage(),
-                        "AI Error",
-                        JOptionPane.ERROR_MESSAGE
-                    );
-                }
-            }
-        }.execute();
-    }
     
+    /**
+     * Creates the button panel with cancel and import buttons.
+     *
+     * @return the button panel
+     */
     private JPanel createButtonPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panel.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
@@ -435,6 +392,12 @@ public class CSVImportDialog extends JDialog {
         return panel;
     }
     
+    /**
+     * Loads and parses a CSV file.
+     * Extracts headers and data rows, then updates the UI.
+     *
+     * @param file the CSV file to load
+     */
     private void loadCSVFile(File file) {
         csvHeaders = new ArrayList<>();
         csvData = new ArrayList<>();
@@ -466,6 +429,13 @@ public class CSVImportDialog extends JDialog {
         }
     }
     
+    /**
+     * Parses a CSV line into a list of fields.
+     * Handles quoted fields and commas within quotes.
+     *
+     * @param line the CSV line to parse
+     * @return a list of fields extracted from the line
+     */
     private List<String> parseCSVLine(String line) {
         List<String> result = new ArrayList<>();
         boolean inQuotes = false;
@@ -490,6 +460,10 @@ public class CSVImportDialog extends JDialog {
         return result;
     }
     
+    /**
+     * Updates the combo boxes with CSV headers.
+     * Attempts to make intelligent selections based on header names.
+     */
     private void updateComboBoxes() {
         // Clear existing items
         dateColumnCombo.removeAllItems();
@@ -539,6 +513,10 @@ public class CSVImportDialog extends JDialog {
         }
     }
     
+    /**
+     * Updates the transaction preview table with parsed data.
+     * Demonstrates how transactions will be imported based on current settings.
+     */
     private void updatePreview() {
         // Clear existing preview data
         previewTableModel.setRowCount(0);
@@ -620,7 +598,12 @@ public class CSVImportDialog extends JDialog {
         recordCountLabel.setText(csvData.size() + " records found, showing " + rowCount);
     }
     
-    // Helper method to parse comma-separated identifiers into a set
+    /**
+     * Parses a comma-separated string of identifiers into a set.
+     *
+     * @param identifiersString comma-separated list of identifiers
+     * @return a set of lowercase identifiers
+     */
     private Set<String> parseIdentifiers(String identifiersString) {
         Set<String> result = new HashSet<>();
         if (identifiersString == null || identifiersString.trim().isEmpty()) {
@@ -637,7 +620,14 @@ public class CSVImportDialog extends JDialog {
         return result;
     }
     
-    // Helper method to check if a value matches any of the identifiers
+    /**
+     * Checks if a value matches any of the provided identifiers.
+     * Performs both exact and partial matching.
+     *
+     * @param value the value to check
+     * @param identifiers the set of identifiers to match against
+     * @return true if the value matches any identifier, false otherwise
+     */
     private boolean matchesAnyIdentifier(String value, Set<String> identifiers) {
         if (value == null || value.isEmpty() || identifiers.isEmpty()) {
             return false;
@@ -660,6 +650,12 @@ public class CSVImportDialog extends JDialog {
         return false;
     }
     
+    /**
+     * Gets the index of the selected column in the CSV headers.
+     *
+     * @param comboBox the combo box containing the selection
+     * @return the index of the selected column, or -1 if none selected
+     */
     private int getSelectedIndex(JComboBox<String> comboBox) {
         String selected = (String) comboBox.getSelectedItem();
         if (selected == null || selected.isEmpty()) {
@@ -668,6 +664,10 @@ public class CSVImportDialog extends JDialog {
         return csvHeaders.indexOf(selected);
     }
     
+    /**
+     * Imports the transactions from the CSV file based on current settings.
+     * Validates data, handles errors, and updates the application with new transactions.
+     */
     private void importTransactions() {
         // Check if we have data to import
         if (csvData.isEmpty()) {
@@ -735,7 +735,7 @@ public class CSVImportDialog extends JDialog {
                     continue;
                 }
             } catch (DateTimeParseException e) {
-                // 记录错误并跳过解析失败的行
+                // Log error and skip rows with parsing failures
                 errorMessages.append("Row ").append(rowIndex + 1)
                               .append(": Failed to parse date '").append(dateStr)
                               .append("' using format '").append(dateFormat).append("' - ")
@@ -786,8 +786,6 @@ public class CSVImportDialog extends JDialog {
             Object[] transaction = {formattedDate, description, category, amount, false};
             transactions.add(transaction);
             LOGGER.log(Level.INFO, "Parsed transaction: {0}", Arrays.toString(transaction));
-
-            /* Jump to here */
         }
         
         // Display warning if some rows were skipped
@@ -815,7 +813,7 @@ public class CSVImportDialog extends JDialog {
             return;
         }
         
-        // 使用UserBillStorage保存交易记录
+        // Save transactions using UserBillStorage
         boolean saveSuccess = UserBillStorage.addTransactions(transactions);
         
         if (!saveSuccess) {
@@ -824,8 +822,8 @@ public class CSVImportDialog extends JDialog {
                 "Save Error", JOptionPane.ERROR_MESSAGE);
         }
         
-        // 将导入的交易数据添加到FinanceData中
-        // financeData.importTransactions(transactions);
+        // Add imported transactions to FinanceData
+        financeData.importTransactions(transactions);
         
         // Import the transactions into the main panel
         parentPanel.addTransactionsFromCSV(transactions);
@@ -839,7 +837,12 @@ public class CSVImportDialog extends JDialog {
         dispose();
     }
 
-    // Add this method for template handling
+    /**
+     * Applies a predefined template for common CSV formats.
+     * Sets column mappings, date format, and transaction type settings.
+     *
+     * @param templateName the name of the template to apply
+     */
     private void applyTemplate(String templateName) {
         applyingTemplate = true;
         
@@ -847,22 +850,22 @@ public class CSVImportDialog extends JDialog {
             switch (templateName) {
                 case "WeChat Pay":
                     // Date settings
-                    dateFormatCombo.setSelectedItem("yyyy/M/d HH:mm"); // 修改为适应 2025/4/14 12:19 的格式
+                    dateFormatCombo.setSelectedItem("yyyy/M/d HH:mm"); // Modified to match format like 2025/4/14 12:19
                     
                     // Column mappings
-                    setComboBoxItem(dateColumnCombo, "交易时间");
-                    setComboBoxItem(descriptionColumnCombo, "商品");
-                    setComboBoxItem(categoryColumnCombo, "交易类型");
-                    setComboBoxItem(amountColumnCombo, "金额(元)");
+                    setComboBoxItem(dateColumnCombo, "Transaction Time");
+                    setComboBoxItem(descriptionColumnCombo, "Product");
+                    categoryColumnCombo.setSelectedIndex(0); // Default/empty
+                    setComboBoxItem(amountColumnCombo, "Amount");
                     
                     // Transaction type settings
                     useTypeColumnCheckBox.setSelected(true);
-                    setComboBoxItem(typeColumnCombo, "收/支");
+                    setComboBoxItem(typeColumnCombo, "Income/Expense");
                     typeColumnCombo.setEnabled(true);
                     
                     // Set identifiers
-                    incomeIdentifierField.setText("收入");
-                    expenseIdentifierField.setText("支出");
+                    incomeIdentifierField.setText("Income");
+                    expenseIdentifierField.setText("Expense");
                     incomeIdentifierField.setEnabled(true);
                     expenseIdentifierField.setEnabled(true);
                     break;
@@ -892,7 +895,13 @@ public class CSVImportDialog extends JDialog {
         }
     }
     
-    // Helper method to set combo box item by text
+    /**
+     * Sets a combo box selection based on text content.
+     * Tries exact match first, then partial match.
+     *
+     * @param comboBox the combo box to set
+     * @param text the text to match
+     */
     private void setComboBoxItem(JComboBox<String> comboBox, String text) {
         // First try exact match
         for (int i = 0; i < comboBox.getItemCount(); i++) {
@@ -905,7 +914,7 @@ public class CSVImportDialog extends JDialog {
         // If no exact match, try to find an item that contains the text
         for (int i = 0; i < comboBox.getItemCount(); i++) {
             String itemText = comboBox.getItemAt(i);
-            if (!itemText.isEmpty() && itemText.contains(text)) {
+            if (!itemText.isEmpty() && itemText.toLowerCase().contains(text.toLowerCase())) {
                 comboBox.setSelectedIndex(i);
                 return;
             }
@@ -914,54 +923,72 @@ public class CSVImportDialog extends JDialog {
         // If still not found, leave as is
     }
 
+    /**
+     * Parses a date string using multiple formats.
+     * Tries the primary format first, then falls back to other formats if needed.
+     *
+     * @param dateStr the date string to parse
+     * @param primaryFormat the primary date format to try first
+     * @return a formatted date string in 'yyyy-MM-dd' format
+     * @throws DateTimeParseException if the date cannot be parsed with any format
+     */
     private String parseDate(String dateStr, String primaryFormat) {
         if (dateStr == null || dateStr.isEmpty()) {
             return "";
         }
 
-        // 尝试使用主要格式解析
+        // Try using the primary format first
         try {
             return parseDateWithFormat(dateStr, primaryFormat);
         } catch (DateTimeParseException e) {
-            // 尝试其他可能的格式
+            // Try other possible formats
             String[] formatsToTry = {
-                // 带连字符的格式
+                // Formats with hyphens
                 "yyyy-MM-dd", "yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss",
-                // 带斜杠的格式
+                // Formats with slashes
                 "yyyy/MM/dd", "yyyy/M/d HH:mm", "yyyy/M/d HH:mm:ss",
                 "yyyy/MM/dd", "yyyy/MM/dd HH:mm", "yyyy/MM/dd HH:mm:ss",
-                // 美式格式
+                // US formats
                 "MM/dd/yyyy", "MM/dd/yyyy HH:mm", "MM/dd/yyyy HH:mm:ss",
-                // 欧式格式
+                // European formats
                 "dd/MM/yyyy", "dd/MM/yyyy HH:mm", "dd/MM/yyyy HH:mm:ss",
-                // 其他常见格式
+                // Other common formats
                 "yyyy.MM.dd", "dd.MM.yyyy", "MM.dd.yyyy"
             };
             
             for (String format : formatsToTry) {
-                if (format.equals(primaryFormat)) continue; // 已经尝试过的格式跳过
+                if (format.equals(primaryFormat)) continue; // Skip format already tried
                 
                 try {
                     return parseDateWithFormat(dateStr, format);
                 } catch (DateTimeParseException ignored) {
-                    // 继续尝试下一个格式
+                    // Continue to next format
                 }
             }
             
-            // 所有格式都失败，抛出原始异常
+            // All formats failed, throw the original exception
             throw e;
         }
     }
 
+    /**
+     * Parses a date string with a specific format.
+     * Handles both date-only and date-time formats.
+     *
+     * @param dateStr the date string to parse
+     * @param format the format to use for parsing
+     * @return a formatted date string in 'yyyy-MM-dd' format
+     * @throws DateTimeParseException if the date cannot be parsed with the given format
+     */
     private String parseDateWithFormat(String dateStr, String format) throws DateTimeParseException {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
         LocalDate date;
         
         if (format.contains("HH:mm") || format.contains("HH:mm:ss")) {
-            // 如果是日期时间格式，先解析为LocalDateTime再转换为LocalDate
+            // If it's a date-time format, first parse as LocalDateTime then convert to LocalDate
             date = LocalDateTime.parse(dateStr, formatter).toLocalDate();
         } else {
-            // 纯日期格式
+            // Pure date format
             date = LocalDate.parse(dateStr, formatter);
         }
         

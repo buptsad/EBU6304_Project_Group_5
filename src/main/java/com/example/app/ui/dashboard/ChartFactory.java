@@ -18,12 +18,37 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Factory class for creating financial charts used throughout the application.
+ * Provides static methods for generating JFreeChart instances with consistent
+ * styling and formatting appropriate for financial data visualization.
+ */
 public class ChartFactory {
-    
+    /**
+     * Private constructor to prevent instantiation of this utility class.
+     * This class only contains static methods and should not be instantiated.
+     */
+    private ChartFactory() {
+        // Prevent instantiation
+    }
+
+    /**
+     * Creates a financial line chart showing income, expenses, and budget over time.
+     * The chart displays three data series:
+     * <ul>
+     *   <li>Income - Shown as a blue line with markers</li>
+     *   <li>Expenses - Shown as a red line with markers</li>
+     *   <li>Daily Budget - Shown as a dashed green line</li>
+     * </ul>
+     *
+     * @param financeData the financial data model providing the chart data
+     * @return a configured JFreeChart instance ready for display
+     */
     public static JFreeChart createFinancialLineChart(FinanceData financeData) {
         // Create dataset
         TimeSeriesCollection dataset = new TimeSeriesCollection();
         String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
+        
         // Add income series
         TimeSeries incomeSeries = new TimeSeries("Income");
         addDataToSeries(incomeSeries, financeData.getDates(), financeData.getDailyIncomes());
@@ -77,6 +102,14 @@ public class ChartFactory {
         return chart;
     }
     
+    /**
+     * Helper method to add financial data to a time series.
+     * Converts LocalDate objects to JFreeChart Day objects and adds values to the series.
+     *
+     * @param series the TimeSeries to add data points to
+     * @param dates the list of dates to include in the series
+     * @param dataMap the map containing date-value pairs to be added
+     */
     private static void addDataToSeries(TimeSeries series, List<LocalDate> dates, Map<LocalDate, Double> dataMap) {
         for (LocalDate date : dates) {
             Double value = dataMap.get(date);
@@ -85,5 +118,27 @@ public class ChartFactory {
                 series.add(new Day(javaDate), value);
             }
         }
+    }
+    
+    /**
+     * Creates a pie chart showing spending breakdown by category.
+     *
+     * @param financeData the financial data model providing the chart data
+     * @return a configured JFreeChart pie chart instance
+     */
+    public static JFreeChart createCategoryPieChart(FinanceData financeData) {
+        // Implementation to be added in future versions
+        return null;
+    }
+    
+    /**
+     * Creates a bar chart comparing budget vs actual spending by category.
+     *
+     * @param financeData the financial data model providing the chart data
+     * @return a configured JFreeChart bar chart instance
+     */
+    public static JFreeChart createBudgetComparisonChart(FinanceData financeData) {
+        // Implementation to be added in future versions
+        return null;
     }
 }
