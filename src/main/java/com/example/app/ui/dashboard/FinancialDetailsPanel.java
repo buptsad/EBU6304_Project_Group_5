@@ -11,21 +11,42 @@ import java.awt.*;
 import java.util.Map;
 
 /**
- * Panel that displays financial details using MVVM pattern.
- * This is the View component that observes the ViewModel.
+ * Panel that displays financial details using the MVVM pattern.
+ * This is the View component that observes the ViewModel for data changes.
+ * <p>
+ * The panel contains three main sections:
+ * <ul>
+ *   <li>Financial Summary - Shows budget, income, expenses, and savings</li>
+ *   <li>Budget Progress - Shows overall and category-specific budget progress</li>
+ *   <li>Financial Tips - Provides personalized financial advice based on spending patterns</li>
+ * </ul>
+ 
  */
 public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListener, 
                                                            FinancialDetailsViewModel.FinancialDetailsChangeListener {
-    // Reference to the ViewModel
+    /** Reference to the ViewModel that provides data and business logic */
     private final FinancialDetailsViewModel viewModel;
     
-    // UI components
+    /** Panel displaying financial summary information */
     private JPanel summaryPanel;
+    
+    /** Panel displaying budget progress by category */
     private JPanel progressPanel;
+    
+    /** Panel displaying financial tips and advice */
     private JPanel tipsPanel;
+    
+    /** Text area for displaying financial advice */
     private JTextArea tipArea;
+    
+    /** Label showing when financial advice was generated */
     private JLabel adviceTimeLabel;
     
+    /**
+     * Constructs a new FinancialDetailsPanel with the specified view model.
+     *
+     * @param viewModel the view model that provides financial data and business logic
+     */
     public FinancialDetailsPanel(FinancialDetailsViewModel viewModel) {
         this.viewModel = viewModel;
         
@@ -51,24 +72,44 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         viewModel.addChangeListener(this);
     }
     
+    /**
+     * Called when the application currency changes.
+     * Refreshes all panels to display values in the new currency.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
+     */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
         // When currency changes, refresh all panels
         refreshAllPanels();
     }
     
+    /**
+     * Called when financial data changes in the view model.
+     * Refreshes all panels to display the updated financial information.
+     */
     @Override
     public void onFinancialDataChanged() {
         // When financial data changes, refresh all panels
         refreshAllPanels();
     }
     
+    /**
+     * Called when only the financial advice changes in the view model.
+     * Updates just the advice panel for better performance.
+     */
     @Override
     public void onAdviceChanged() {
         // When only advice changes, just update that part
         updateAdviceDisplay();
     }
     
+    /**
+     * Refreshes all panels by recreating them with current data.
+     * This is used when significant data changes occur, such as
+     * currency changes or financial data updates.
+     */
     private void refreshAllPanels() {
         removeAll();
         
@@ -87,6 +128,11 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         repaint();
     }
     
+    /**
+     * Creates the financial summary panel displaying key financial metrics.
+     *
+     * @return a panel containing financial summary information
+     */
     private JPanel createSummaryPanel() {
         JPanel summaryPanel = new JPanel();
         summaryPanel.setLayout(new BoxLayout(summaryPanel, BoxLayout.Y_AXIS));
@@ -124,6 +170,11 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         return summaryPanel;
     }
     
+    /**
+     * Creates the budget progress panel with overall and category-specific progress bars.
+     *
+     * @return a panel containing budget progress information
+     */
     private JPanel createCategoryProgressPanel() {
         JPanel progressPanel = new JPanel();
         progressPanel.setLayout(new BoxLayout(progressPanel, BoxLayout.Y_AXIS));
@@ -222,6 +273,17 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         return progressPanel;
     }
     
+    /**
+     * Creates a progress bar with color coding based on percentage value.
+     * <ul>
+     *   <li>Green: Less than 70% used</li>
+     *   <li>Orange: Between 70% and 90% used</li>
+     *   <li>Red: More than 90% used</li>
+     * </ul>
+     *
+     * @param percentage the percentage value to display (0-100)
+     * @return a configured progress bar
+     */
     private JProgressBar createProgressBar(double percentage) {
         JProgressBar progressBar = new JProgressBar(0, 100);
         progressBar.setValue((int) percentage);
@@ -239,6 +301,12 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         return progressBar;
     }
     
+    /**
+     * Creates the financial tips panel that displays personalized advice
+     * based on spending patterns and budget status.
+     *
+     * @return a panel containing financial tips and advice
+     */
     private JPanel createTipsPanel() {
         JPanel tipsPanel = new JPanel();
         tipsPanel.setLayout(new BoxLayout(tipsPanel, BoxLayout.Y_AXIS));
@@ -319,6 +387,13 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         return tipsPanel;
     }
     
+    /**
+     * Creates a panel containing a label-value pair with consistent formatting.
+     *
+     * @param label the description text
+     * @param value the value text (usually a currency amount)
+     * @return a formatted panel containing the label and value
+     */
     private JPanel createLabelPanel(String label, String value) {
         JPanel panel = new JPanel(new BorderLayout(10, 0));
         panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 25));
@@ -335,7 +410,10 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         return panel;
     }
     
-    // Method to update advice display when it changes
+    /**
+     * Updates only the financial advice display when advice changes.
+     * This is more efficient than recreating all panels.
+     */
     public void updateAdviceDisplay() {
         if (tipsPanel != null) {
             remove(tipsPanel);
@@ -346,6 +424,10 @@ public class FinancialDetailsPanel extends JPanel implements CurrencyChangeListe
         }
     }
     
+    /**
+     * Called when this panel is removed from its container.
+     * Performs necessary cleanup by removing listeners and releasing resources.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();

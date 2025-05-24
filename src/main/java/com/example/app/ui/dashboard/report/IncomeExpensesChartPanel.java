@@ -24,11 +24,39 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * A panel that displays a time series chart comparing income and expenses over time.
+ * This component visualizes financial trends and patterns by showing daily income
+ * and expense data for the last 30 days.
+ * <p>
+ * The chart displays two series:
+ * <ul>
+ *   <li>Income - Daily income values plotted with a green line</li>
+ *   <li>Expenses - Daily expense values plotted with a red line</li>
+ * </ul>
+ 
+ * <p>
+ * This panel implements both currency change and chart data change listeners
+ * to ensure that the chart display is always current and accurate.
+ 
+ */
 public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeListener, ChartDataChangeListener {
     
+    /**
+     * The view model that provides data for the chart
+     */
     private final IncomeExpensesChartViewModel viewModel;
+    
+    /**
+     * The panel containing the JFreeChart chart
+     */
     private ChartPanel chartPanel;
     
+    /**
+     * Constructs a new IncomeExpensesChartPanel with the specified view model.
+     *
+     * @param viewModel the view model providing the chart data
+     */
     public IncomeExpensesChartPanel(IncomeExpensesChartViewModel viewModel) {
         this.viewModel = viewModel;
         this.viewModel.addChangeListener(this);
@@ -50,6 +78,11 @@ public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeLi
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
     }
     
+    /**
+     * Creates a JFreeChart time series chart displaying income and expense data over time.
+     * 
+     * @return a configured JFreeChart instance
+     */
     private JFreeChart createChart() {
         // Create dataset for the chart
         TimeSeriesCollection dataset = createDataset();
@@ -94,6 +127,12 @@ public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeLi
         return chart;
     }
     
+    /**
+     * Creates a dataset containing income and expense time series data.
+     * Data is retrieved from the view model and formatted for the chart.
+     *
+     * @return a populated TimeSeriesCollection
+     */
     private TimeSeriesCollection createDataset() {
         // Create time series for income and expenses
         TimeSeries incomeSeries = new TimeSeries("Income");
@@ -130,12 +169,23 @@ public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeLi
         return dataset;
     }
 
+    /**
+     * Called when the application currency changes.
+     * Updates the chart to reflect the new currency.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
+     */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
         // Refresh chart when currency changes
         refreshChart();
     }
     
+    /**
+     * Called when the chart data changes in the ViewModel.
+     * Updates the chart to reflect the new data.
+     */
     @Override
     public void onChartDataChanged() {
         // Called by ViewModel when data changes
@@ -143,7 +193,8 @@ public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeLi
     }
     
     /**
-     * Refresh the chart with current data
+     * Refreshes the chart with current data from the view model.
+     * Creates a new chart and updates the chart panel.
      */
     public void refreshChart() {
         JFreeChart chart = createChart();
@@ -151,6 +202,10 @@ public class IncomeExpensesChartPanel extends JPanel implements CurrencyChangeLi
         chartPanel.repaint();
     }
     
+    /**
+     * Called when this panel is removed from its container.
+     * Performs necessary cleanup by removing listeners and cleaning up the view model.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();

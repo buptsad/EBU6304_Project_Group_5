@@ -13,11 +13,39 @@ import java.awt.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * A panel that displays recent financial transactions in a table format.
+ * This component follows the MVVM pattern with a dedicated view model
+ * for transaction data management and presentation.
+ * <p>
+ * The panel includes:
+ * <ul>
+ *   <li>A table showing recent transactions with date, description, category, and amount</li>
+ *   <li>Color-coded transaction amounts (green for income, red for expenses)</li>
+ *   <li>A button to navigate to the full transactions view</li>
+ * </ul>
+ 
+ * <p>
+ * This panel implements both CurrencyChangeListener and TransactionChangeListener
+ * to ensure that the display is updated when either currency settings or
+ * transaction data changes.
+ 
+ */
 public class DashboardTransactionsPanel extends JPanel implements CurrencyChangeListener, TransactionChangeListener {
+    /** Table for displaying transaction data */
     private JTable transactionsTable;
+    
+    /** Table model for managing transaction data */
     private DefaultTableModel tableModel;
+    
+    /** View model providing transaction data and business logic */
     private final DashboardTransactionsViewModel viewModel;
     
+    /**
+     * Creates a new transactions panel for the specified user.
+     *
+     * @param username the username of the current user
+     */
     public DashboardTransactionsPanel(String username) {
         // Initialize ViewModel
         this.viewModel = new DashboardTransactionsViewModel(username);
@@ -47,6 +75,10 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
     }
     
+    /**
+     * Creates and configures the transactions table with appropriate columns,
+     * model, and renderers.
+     */
     private void createTransactionsTable() {
         // Define table columns
         String[] columns = {"Date", "Description", "Category", "Amount"};
@@ -85,6 +117,10 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         updateAmountRenderer();
     }
     
+    /**
+     * Updates the table's amount column renderer to display currency symbols
+     * and color-code amounts based on whether they're income or expenses.
+     */
     private void updateAmountRenderer() {
         // Get currency symbol from CurrencyManager
         final String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
@@ -121,6 +157,10 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         }
     }
     
+    /**
+     * Populates the transactions table with the most recent transactions
+     * retrieved from the view model.
+     */
     private void populateTableWithRecentTransactions() {
         // Clear existing data
         tableModel.setRowCount(0);
@@ -140,6 +180,10 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         }
     }
     
+    /**
+     * Opens the full transactions panel in the main application window.
+     * Currently displays a placeholder message.
+     */
     private void openTransactionsPanel() {
         // Get the main window reference
         Window window = SwingUtilities.getWindowAncestor(this);
@@ -154,6 +198,13 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         }
     }
     
+    /**
+     * Called when the application currency changes.
+     * Updates the table to display amounts with the new currency symbol.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
+     */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
         // Update currency formatter
@@ -161,6 +212,10 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         transactionsTable.repaint();
     }
     
+    /**
+     * Called when transaction data changes in the view model.
+     * Updates the table to display the latest transaction data.
+     */
     @Override
     public void onTransactionsChanged() {
         // Called by ViewModel when transaction data changes
@@ -177,6 +232,10 @@ public class DashboardTransactionsPanel extends JPanel implements CurrencyChange
         });
     }
     
+    /**
+     * Called when this panel is removed from its container.
+     * Performs necessary cleanup by removing listeners and freeing resources.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();

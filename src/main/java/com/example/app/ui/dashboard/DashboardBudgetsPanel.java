@@ -11,16 +11,34 @@ import java.awt.*;
 import java.util.Map;
 import java.util.logging.Logger;
 
+/**
+ * A panel that displays and manages budget categories with their allocations and spending.
+ * This component follows the MVVM pattern and communicates with a ViewModel to display
+ * budget data and handle user interactions.
+ * <p>
+ * The panel includes:
+ * <ul>
+ *   <li>An overall budget progress indicator</li>
+ *   <li>A table of budget categories with their allocated amounts and spending</li>
+ *   <li>UI elements for editing and deleting budget categories</li>
+ * </ul>
+ */
 public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListener, BudgetChangeListener {
     private static final Logger LOGGER = Logger.getLogger(DashboardBudgetsPanel.class.getName());
     
-    // ViewModel reference
+    /** ViewModel reference */
     private final DashboardBudgetsViewModel viewModel;
     
-    // UI components
+    /** UI components */
     private final JPanel categoriesPanel;
+    /** Currency symbol for displaying budget amounts */
     private String currencySymbol;
     
+    /**
+     * Creates a new budget dashboard panel for the specified user.
+     *
+     * @param username the username of the current user
+     */
     public DashboardBudgetsPanel(String username) {
         // Initialize ViewModel
         this.viewModel = new DashboardBudgetsViewModel(username);
@@ -56,15 +74,15 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         
         // Categories panel
         categoriesPanel = new JPanel(new BorderLayout());
-        // 设置首选大小和最大大小
+        // Set preferred and maximum size
         categoriesPanel.setPreferredSize(new Dimension(400, 200));
         categoriesPanel.setMaximumSize(new Dimension(600, 400));
         
-        // 创建表格模型
+        // Create table model
         DefaultTableModel tableModel = new DefaultTableModel() {
             @Override
             public boolean isCellEditable(int row, int column) {
-                // 只允许编辑按钮列
+                // Only allow editing the buttons column
                 return column == 4;
             }
         };
@@ -74,7 +92,7 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         tableModel.addColumn("Usage");
         tableModel.addColumn("Actions");
 
-        // 创建表格并设置属性
+        // Create table and set properties
         JTable budgetTable = new JTable(tableModel);
         budgetTable.setRowHeight(40);
         budgetTable.getColumnModel().getColumn(0).setPreferredWidth(100);
@@ -83,20 +101,20 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         budgetTable.getColumnModel().getColumn(3).setPreferredWidth(100);
         budgetTable.getColumnModel().getColumn(4).setPreferredWidth(100);
         
-        // 添加表格网格线设置
+        // Add table grid line settings
         budgetTable.setShowGrid(true);
         budgetTable.setGridColor(Color.GRAY);
         budgetTable.setIntercellSpacing(new Dimension(1, 1));
         budgetTable.setBorder(BorderFactory.createLineBorder(Color.GRAY));
         
-        // 为进度条列添加自定义渲染器
+        // Add custom renderer for progress bar column
         budgetTable.getColumnModel().getColumn(3).setCellRenderer(new ProgressBarRenderer());
         
-        // 为操作按钮列添加自定义渲染器和编辑器
+        // Add custom renderer and editor for action buttons column
         budgetTable.getColumnModel().getColumn(4).setCellRenderer(new ButtonRenderer());
         budgetTable.getColumnModel().getColumn(4).setCellEditor(new ButtonEditor(new JCheckBox()));
         
-        // 将表格添加到滚动面板
+        // Add table to scroll pane
         JScrollPane tableScrollPane = new JScrollPane(budgetTable);
         tableScrollPane.setBorder(BorderFactory.createEmptyBorder());
         categoriesPanel.add(tableScrollPane, BorderLayout.CENTER);
@@ -113,10 +131,14 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         CurrencyManager.getInstance().addCurrencyChangeListener(this);
     }
     
-    // 更新类别表格数据
+    /**
+     * Updates the category table data with the current budget and expense information.
+     *
+     * @param table the JTable to update with budget data
+     */
     private void updateCategoryTable(JTable table) {
         DefaultTableModel model = (DefaultTableModel) table.getModel();
-        model.setRowCount(0); // 清空现有行
+        model.setRowCount(0); // Clear existing rows
         
         Map<String, Double> budgets = viewModel.getCategoryBudgets();
         Map<String, Double> expenses = viewModel.getCategoryExpenses();
@@ -131,11 +153,17 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
                 currencySymbol + String.format("%.2f", budget),
                 currencySymbol + String.format("%.2f", expense),
                 percentage,
-                "" // 操作按钮列占位
+                "" // Placeholder for action buttons
             });
         }
     }
     
+    /**
+     * Creates a progress bar with the appropriate color based on percentage value.
+     *
+     * @param percentage the percentage value (0-100) to display in the progress bar
+     * @return a configured JProgressBar instance
+     */
     private JProgressBar createProgressBar(double percentage) {
         JProgressBar progressBar = new JProgressBar(0, 100);
         progressBar.setValue((int) percentage);
@@ -153,6 +181,11 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         return progressBar;
     }
     
+    /**
+     * Opens a dialog to edit a budget category and updates the model if confirmed.
+     *
+     * @param category the name of the category to edit
+     */
     private void editCategory(String category) {
         double currentBudget = viewModel.getCategoryBudget(category);
         BudgetDialog dialog = new BudgetDialog(
@@ -174,6 +207,11 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         }
     }
     
+    /**
+     * Shows a confirmation dialog and deletes a budget category if confirmed.
+     *
+     * @param category the name of the category to delete
+     */
     private void deleteCategory(String category) {
         int result = JOptionPane.showConfirmDialog(
                 this,
@@ -194,6 +232,9 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         }
     }
     
+    /**
+     * Opens a dialog to add a new budget category and updates the model if confirmed.
+     */
     private void addNewCategory() {
         BudgetDialog dialog = new BudgetDialog(
                 SwingUtilities.getWindowAncestor(this), 
@@ -215,18 +256,33 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         }
     }
 
+    /**
+     * Called when budget data changes in the view model.
+     * Updates the UI to reflect the changes.
+     */
     @Override
     public void onBudgetDataChanged() {
-        // 更新UI当视图模型通知预算变化时
+        // Update UI when the view model notifies of budget changes
         updateCategoryTable((JTable)((JScrollPane)categoriesPanel.getComponent(0)).getViewport().getView());
     }
 
+    /**
+     * Called when currency settings change.
+     * Updates the UI to reflect the new currency.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
+     */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
         this.currencySymbol = currencySymbol;
         updateCategoryTable((JTable)((JScrollPane)categoriesPanel.getComponent(0)).getViewport().getView());
     }
     
+    /**
+     * Called when this panel is removed from its container.
+     * Cleans up event listeners and other resources.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();
@@ -236,7 +292,12 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         viewModel.cleanup();
     }
     
-    // Public method to update username if needed
+    /**
+     * Updates the panel to display data for a different user.
+     * Replaces this panel with a new one in the parent container.
+     *
+     * @param username the username of the user to display data for
+     */
     public void setUsername(String username) {
         // In MVVM, we'd create a new ViewModel for the new user
         // For simplicity, we'll replace the entire panel in the parent component
@@ -251,7 +312,9 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         }
     }
     
-    // Add a button to open the full budget panel view
+    /**
+     * Opens the full budget management panel in the main application window.
+     */
     private void openFullBudgetPanel() {
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window instanceof JFrame) {
@@ -263,13 +326,30 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         }
     }
     
-    // 进度条单元格渲染器
+    /**
+     * Custom renderer for displaying progress bars in table cells.
+     * Colors change based on percentage values.
+     */
     class ProgressBarRenderer extends JProgressBar implements javax.swing.table.TableCellRenderer {
+        /**
+         * Creates a new progress bar renderer.
+         */
         public ProgressBarRenderer() {
             super(0, 100);
             setStringPainted(true);
         }
 
+        /**
+         * Returns a configured progress bar for rendering in the table cell.
+         *
+         * @param table the JTable containing the cell renderer
+         * @param value the value to display in this cell
+         * @param isSelected whether the cell is selected
+         * @param hasFocus whether the cell has focus
+         * @param row the row index of the cell
+         * @param column the column index of the cell
+         * @return the progress bar component to render the cell
+         */
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
                                                      boolean isSelected, boolean hasFocus,
@@ -277,13 +357,13 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
             double percentage = (Double) value;
             setValue((int) percentage);
             
-            // 根据百分比设置颜色
+            // Set color based on percentage
             if (percentage < 80) {
-                setForeground(new Color(46, 204, 113)); // 绿色
+                setForeground(new Color(46, 204, 113)); // Green
             } else if (percentage < 100) {
-                setForeground(new Color(241, 196, 15)); // 黄色
+                setForeground(new Color(241, 196, 15)); // Yellow
             } else {
-                setForeground(new Color(231, 76, 60));  // 红色
+                setForeground(new Color(231, 76, 60));  // Red
             }
             
             setString(String.format("%.2f%%", percentage));
@@ -291,11 +371,16 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         }
     }
 
-    // 按钮渲染器
+    /**
+     * Custom renderer for displaying edit and delete buttons in table cells.
+     */
     class ButtonRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
         private JButton editButton;
         private JButton deleteButton;
         
+        /**
+         * Creates a new button renderer with Edit and Delete buttons.
+         */
         public ButtonRenderer() {
             setLayout(new GridLayout(1, 2, 5, 0));
             editButton = new JButton("Edit");
@@ -304,6 +389,17 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
             add(deleteButton);
         }
         
+        /**
+         * Returns a panel containing Edit and Delete buttons for rendering in the table cell.
+         *
+         * @param table the JTable containing the cell renderer
+         * @param value the value to display in this cell
+         * @param isSelected whether the cell is selected
+         * @param hasFocus whether the cell has focus
+         * @param row the row index of the cell
+         * @param column the column index of the cell
+         * @return the button panel component to render the cell
+         */
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
                                                     boolean isSelected, boolean hasFocus,
@@ -312,13 +408,20 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
         }
     }
 
-    // 按钮编辑器
+    /**
+     * Custom cell editor for handling edit and delete button actions in table cells.
+     */
     class ButtonEditor extends DefaultCellEditor {
         protected JPanel panel;
         protected JButton editButton;
         protected JButton deleteButton;
         private String category;
         
+        /**
+         * Creates a new button editor with action handlers for Edit and Delete buttons.
+         *
+         * @param checkBox a checkbox component (required by DefaultCellEditor)
+         */
         public ButtonEditor(JCheckBox checkBox) {
             super(checkBox);
             panel = new JPanel(new GridLayout(1, 2, 5, 0));
@@ -327,13 +430,13 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
 
             editButton.addActionListener(e -> {
                 fireEditingStopped();
-                // 获取当前行的类别名称
+                // Get the category name from the current row
                 editCategory(category);
             });
             
             deleteButton.addActionListener(e -> {
                 fireEditingStopped();
-                // 获取当前行的类别名称
+                // Get the category name from the current row
                 deleteCategory(category);
             });
             
@@ -341,14 +444,29 @@ public class DashboardBudgetsPanel extends JPanel implements CurrencyChangeListe
             panel.add(deleteButton);
         }
         
+        /**
+         * Prepares the editor with the category from the selected row.
+         *
+         * @param table the JTable containing the cell being edited
+         * @param value the value in the cell being edited
+         * @param isSelected whether the cell is selected
+         * @param row the row of the cell being edited
+         * @param column the column of the cell being edited
+         * @return the component for editing
+         */
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value,
                                                   boolean isSelected, int row, int column) {
-            // 获取当前行的类别名称
+            // Get the category name from the current row
             category = (String) table.getValueAt(row, 0);
             return panel;
         }
         
+        /**
+         * Returns the edited value.
+         *
+         * @return the edited value
+         */
         @Override
         public Object getCellEditorValue() {
             return "";

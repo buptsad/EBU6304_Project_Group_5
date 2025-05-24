@@ -1,30 +1,35 @@
 package com.example.app.ui;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * 管理应用程序中的货币设置并通知监听器货币变化
+ * Manages the application's currency settings and notifies listeners when the currency changes.
+ * <p>
+ * This class is implemented as a singleton and provides methods to get/set the current currency,
+ * register/unregister listeners, and format currency amounts.
+ 
  */
 public class CurrencyManager {
-    // 单例实例
+    /** Singleton instance */
     private static CurrencyManager instance;
-    
-    // 当前货币符号 (默认为美元)
+
+    /** Current currency symbol (default is USD "$") */
     private String currencySymbol = "$";
-    
-    // 当前货币编码 (默认为USD)
+
+    /** Current currency code (default is "USD") */
     private String currencyCode = "USD";
-    
-    // 监听器列表 - 使用线程安全的CopyOnWriteArrayList
+
+    /** List of listeners for currency changes (thread-safe) */
     private List<CurrencyChangeListener> listeners = new CopyOnWriteArrayList<>();
-    
-    // 私有构造函数
+
+    /** Private constructor for singleton */
     private CurrencyManager() {}
-    
+
     /**
-     * 获取单例实例
+     * Gets the singleton instance of CurrencyManager.
+     *
+     * @return the CurrencyManager instance
      */
     public static synchronized CurrencyManager getInstance() {
         if (instance == null) {
@@ -32,78 +37,98 @@ public class CurrencyManager {
         }
         return instance;
     }
-    
+
     /**
-     * 获取当前货币符号
+     * Gets the current currency symbol.
+     *
+     * @return the currency symbol
      */
     public String getCurrencySymbol() {
         return currencySymbol;
     }
-    
+
     /**
-     * 获取当前货币代码
+     * Gets the current currency code.
+     *
+     * @return the currency code
      */
     public String getCurrencyCode() {
         return currencyCode;
     }
-    
+
     /**
-     * 设置货币信息并通知所有监听器
+     * Sets the currency code and symbol, and notifies all listeners if changed.
+     *
+     * @param code   the new currency code
+     * @param symbol the new currency symbol
      */
     public void setCurrency(String code, String symbol) {
         boolean changed = !this.currencyCode.equals(code) || !this.currencySymbol.equals(symbol);
-        
+
         this.currencyCode = code;
         this.currencySymbol = symbol;
-        
+
         if (changed) {
             notifyListeners();
         }
     }
-    
+
     /**
-     * 添加货币变化监听器
+     * Adds a currency change listener.
+     *
+     * @param listener the listener to add
      */
     public void addCurrencyChangeListener(CurrencyChangeListener listener) {
         if (!listeners.contains(listener)) {
             listeners.add(listener);
         }
     }
-    
+
     /**
-     * 移除货币变化监听器
+     * Removes a currency change listener.
+     *
+     * @param listener the listener to remove
      */
     public void removeCurrencyChangeListener(CurrencyChangeListener listener) {
         listeners.remove(listener);
     }
-    
+
     /**
-     * 通知所有监听器货币已变化
+     * Notifies all registered listeners that the currency has changed.
      */
     private void notifyListeners() {
-        // 使用CopyOnWriteArrayList可以安全地遍历，即使在遍历期间有修改
+        // CopyOnWriteArrayList allows safe iteration even if listeners are modified during iteration
         for (CurrencyChangeListener listener : listeners) {
             try {
                 listener.onCurrencyChanged(currencyCode, currencySymbol);
             } catch (Exception e) {
-                // 捕获通知过程中的异常，防止一个监听器的异常影响其他监听器
+                // Catch exceptions to prevent one listener from affecting others
                 System.err.println("Error notifying listener: " + e.getMessage());
                 e.printStackTrace();
             }
         }
     }
-    
+
     /**
-     * 格式化金额显示，根据当前货币符号
+     * Formats a monetary amount using the current currency symbol.
+     *
+     * @param amount the amount to format
+     * @return the formatted currency string
      */
     public String formatCurrency(double amount) {
         return String.format("%s%.2f", currencySymbol, amount);
     }
-    
+
     /**
-     * 货币变化监听器接口
+     * Listener interface for currency changes.
      */
     public interface CurrencyChangeListener {
+        /**
+         * Called when the currency changes.
+         *
+         * @param currencyCode   the new currency code
+         * @param currencySymbol the new currency symbol
+         */
         void onCurrencyChanged(String currencyCode, String currencySymbol);
     }
 }

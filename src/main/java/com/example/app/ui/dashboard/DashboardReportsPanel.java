@@ -13,17 +13,41 @@ import com.example.app.viewmodel.dashboard.report.IncomeExpensesChartViewModel;
 
 import java.awt.*;
 
+/**
+ * A panel displaying financial reports using charts and graphs.
+ * This component follows the MVVM pattern, using view models to manage data
+ * and presentation logic for the financial reports.
+ * <p>
+ * The panel includes multiple chart visualizations:
+ * <ul>
+ *   <li>Income vs. Expenses chart showing time series data</li>
+ *   <li>Category Spending chart comparing budget vs. actual spending by category</li>
+ * </ul>
+ 
+ */
 public class DashboardReportsPanel extends JPanel implements CurrencyChangeListener, ReportDataChangeListener {
     
-    // ViewModels
+    /** The main view model for the reports dashboard */
     private final DashboardReportsViewModel viewModel;
+    
+    /** View model specifically for the income vs. expenses chart */
     private final IncomeExpensesChartViewModel incomeExpensesViewModel;
+    
+    /** View model specifically for the category spending chart */
     private final CategorySpendingChartViewModel categorySpendingViewModel;
     
-    // UI components
+    /** Panel displaying the income vs. expenses chart */
     private IncomeExpensesChartPanel incomeExpensesPanel;
+    
+    /** Panel displaying the category spending chart */
     private CategorySpendingChartPanel categorySpendingPanel;
     
+    /**
+     * Constructs a new reports dashboard panel for the specified user.
+     * Initializes view models and UI components for financial reporting.
+     *
+     * @param username the username of the current user
+     */
     public DashboardReportsPanel(String username) {
         // Initialize ViewModels
         this.viewModel = new DashboardReportsViewModel(username);
@@ -69,7 +93,8 @@ public class DashboardReportsPanel extends JPanel implements CurrencyChangeListe
     }
     
     /**
-     * Open the full reports panel
+     * Opens the full reports panel in the main application window.
+     * Currently shows a dialog message as a placeholder.
      */
     private void openFullReports() {
         Window window = SwingUtilities.getWindowAncestor(this);
@@ -82,17 +107,32 @@ public class DashboardReportsPanel extends JPanel implements CurrencyChangeListe
         }
     }
     
+    /**
+     * Called when the application currency changes.
+     * Currency changes are handled by individual chart panels in this implementation.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
+     */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
         // Currency changes will be handled by individual chart panels
     }
     
+    /**
+     * Called when report data changes in the view model.
+     * Data changes are handled by individual chart panels in this implementation.
+     */
     @Override
     public void onReportDataChanged() {
         // Data changes will be handled by individual chart panels
         // which are already listening to their own ViewModels
     }
     
+    /**
+     * Called when this panel is removed from its container.
+     * Performs necessary cleanup by removing listeners and cleaning up resources.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();
