@@ -1,204 +1,183 @@
 package com.example.app.ui.pages;
 
-import com.example.app.model.FinanceData;
 import com.example.app.ui.CurrencyManager;
 import com.example.app.ui.CurrencyManager.CurrencyChangeListener;
-import com.example.app.ui.dashboard.BudgetCategoryPanel;
 import com.example.app.ui.dashboard.BudgetDialog;
-import com.example.app.ui.pages.AI.getRes;
-import com.example.app.model.CSVDataImporter;
-import com.example.app.model.DataRefreshListener;
-import com.example.app.model.DataRefreshManager;
-
+import com.example.app.viewmodel.BudgetViewModel;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
-
-import org.json.JSONObject;
-
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.io.IOException;
 import java.util.*;
-import java.util.List;
 
 /**
- * Panel for managing budget allocations and AI-suggested budget improvements
+ * A panel for managing user budget allocations and viewing AI-generated budget suggestions.
+ * This component follows the MVVM pattern and interacts with a BudgetViewModel to display
+ * and update budget data.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>Displays a table of user budget categories, allocations, and spending</li>
+ *   <li>Allows editing, adding, and deleting budget categories</li>
+ *   <li>Shows AI-generated budget suggestions and allows applying them</li>
+ *   <li>Visualizes budget usage with progress bars and difference indicators</li>
+ * </ul>
+ 
  */
-public class BudgetsPanel extends JPanel implements CurrencyChangeListener, DataRefreshListener {
-    // Core data fields
-    private final FinanceData financeData;   // Stores all budget and expense data
-    private final JPanel userBudgetsPanel;   // UI panel for user-defined budgets
-    private final JPanel aiSuggestedPanel;   // UI panel for AI-suggested budgets
-    private Random random = new Random();    // For generating random suggestions
-    private String username;                 // Current user identifier
-    
-    // Constants for UI settings
-    private static final int HEADER_FONT_SIZE = 22;
-    private static final int LABEL_FONT_SIZE = 14;
-    private static final int PANEL_SPACING = 20;
-    private static final int PADDING = 10;
+public class BudgetsPanel extends JPanel implements CurrencyChangeListener, BudgetViewModel.BudgetChangeListener {
+    /** The ViewModel providing budget data and business logic */
+    private final BudgetViewModel viewModel;
+    /** Panel containing the user's budget table */
+    private final JPanel userBudgetsPanel;
+    /** Panel containing the AI suggested budget table */
+    private final JPanel aiSuggestedPanel;
+    /** Stores the last generated AI budget suggestions */
+    private Map<String, Double> currentSuggestedBudgets;
+    /** The current currency symbol */
+    private String currencySymbol;
 
     /**
-     * Constructs the budget management panel
-     * @param username Current logged-in user
+     * Constructs a new BudgetsPanel for the specified user.
+     *
+     * @param username the username of the current user
      */
     public BudgetsPanel(String username) {
-        this.username = username;
-        this.financeData = new FinanceData();
+        // Initialize ViewModel
+        this.viewModel = new BudgetViewModel(username);
+        this.viewModel.addBudgetChangeListener(this);
+        this.currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
         
-        // Set data directory and load budget data
-        String dataDirectory = ".\\user_data\\" + username;
-        financeData.setDataDirectory(dataDirectory);
-        
-        // Load transaction data first to calculate expenses
-        loadTransactionData();
-        
-        // Then load budget allocations
-        financeData.loadBudgets();
-        
-        // Configure main panel layout
-        setLayout(new BorderLayout(PANEL_SPACING, 0));
-        setBorder(BorderFactory.createEmptyBorder(PANEL_SPACING, PANEL_SPACING, PANEL_SPACING, PANEL_SPACING));
+        setLayout(new BorderLayout(20, 0));
+        setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Create and add header section
-        JPanel headerPanel = createHeaderPanel();
-        add(headerPanel, BorderLayout.NORTH);
-
-        // Create main content with user and AI panels
-        JPanel contentPanel = new JPanel(new GridLayout(1, 2, PANEL_SPACING, 0));
-
-        // User budget panel - left side
-        JPanel userPanel = createUserBudgetPanel();
-        contentPanel.add(userPanel);
-
-        // AI suggested budget panel - right side
-        JPanel aiPanel = createAISuggestedPanel();
-        contentPanel.add(aiPanel);
-
-        // Add both panels to the content area
-        add(contentPanel, BorderLayout.CENTER);
-        
-        // Register as listener for currency and data refresh events
-        CurrencyManager.getInstance().addCurrencyChangeListener(this);
-        DataRefreshManager.getInstance().addListener(this);
-    }
-    
-    /**
-     * Creates the header panel with title and overall budget progress
-     * @return Configured header panel
-     */
-    private JPanel createHeaderPanel() {
+        // Header
         JPanel headerPanel = new JPanel(new BorderLayout());
-        
-        // Title label
         JLabel titleLabel = new JLabel("Budget Management");
-        Font titleFont = new Font(titleLabel.getFont().getName(), Font.BOLD, HEADER_FONT_SIZE);
-        titleLabel.setFont(titleFont);
+        titleLabel.setFont(new Font(titleLabel.getFont().getName(), Font.BOLD, 22));
         headerPanel.add(titleLabel, BorderLayout.WEST);
         
-        // Overall budget progress section
-        JPanel overallPanel = new JPanel(new BorderLayout());
-        
-        // Calculate overall budget usage percentage
-        double overallPercentage = financeData.getOverallBudgetPercentage();
-        
-        // Display percentage text
-        JLabel overallLabel = new JLabel(String.format("Overall Budget: %.2f%% used", overallPercentage));
-        Font labelFont = new Font(overallLabel.getFont().getName(), Font.BOLD, LABEL_FONT_SIZE);
-        overallLabel.setFont(labelFont);
-        overallPanel.add(overallLabel, BorderLayout.NORTH);
-        
-        // Add visual progress bar
-        JProgressBar overallProgressBar = createProgressBar(overallPercentage);
-        overallProgressBar.setPreferredSize(new Dimension(getWidth(), 15));
-        overallPanel.add(overallProgressBar, BorderLayout.CENTER);
-        
+        // Overall budget progress
+        JPanel overallPanel = createOverallBudgetPanel();
         headerPanel.add(overallPanel, BorderLayout.SOUTH);
         headerPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
-        
-        return headerPanel;
-    }
-    
-    /**
-     * Creates the user budget panel with current allocations
-     * @return Configured user budget panel
-     */
-    private JPanel createUserBudgetPanel() {
-        // Create panel with border layout
+        add(headerPanel, BorderLayout.NORTH);
+
+        // Main content panel - split into left and right
+        JPanel contentPanel = new JPanel(new GridLayout(1, 2, 20, 0));
+
+        // Left panel - Current budget allocation (Table version)
         JPanel userPanel = new JPanel(new BorderLayout());
-        
-        // Create titled border with larger font
         TitledBorder userBorder = BorderFactory.createTitledBorder("Your Budget Allocation");
-        Font borderFont = new Font(getFont().getName(), Font.BOLD, 16);
-        userBorder.setTitleFont(borderFont);
-        
-        // Add compound border with padding
+        userBorder.setTitleFont(new Font(getFont().getName(), Font.BOLD, 16));
         userPanel.setBorder(BorderFactory.createCompoundBorder(
                 userBorder,
-                BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING)
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)
         ));
 
-        // Create panel for budget categories with vertical box layout
-        userBudgetsPanel = new JPanel();
-        userBudgetsPanel.setLayout(new BoxLayout(userBudgetsPanel, BoxLayout.Y_AXIS));
-        updateUserCategoryPanels();
+        // Create user budget table
+        userBudgetsPanel = new JPanel(new BorderLayout());
+        
+        // Create table model for user budgets
+        DefaultTableModel userTableModel = new DefaultTableModel() {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                // Only allow editing the buttons column
+                return column == 4;
+            }
+        };
+        userTableModel.addColumn("Category");
+        userTableModel.addColumn("Budget");
+        userTableModel.addColumn("Spent");
+        userTableModel.addColumn("Usage");
+        userTableModel.addColumn("Actions");
 
-        // Add scrolling capability
-        JScrollPane userScrollPane = new JScrollPane(userBudgetsPanel);
-        userScrollPane.setBorder(BorderFactory.createEmptyBorder());
-        userScrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        userPanel.add(userScrollPane, BorderLayout.CENTER);
+        // Create user budget table
+        JTable userBudgetTable = new JTable(userTableModel);
+        userBudgetTable.setRowHeight(40);
+        userBudgetTable.getColumnModel().getColumn(0).setPreferredWidth(100);
+        userBudgetTable.getColumnModel().getColumn(1).setPreferredWidth(80);
+        userBudgetTable.getColumnModel().getColumn(2).setPreferredWidth(80);
+        userBudgetTable.getColumnModel().getColumn(3).setPreferredWidth(100);
+        userBudgetTable.getColumnModel().getColumn(4).setPreferredWidth(100);
+        
+        // Add custom renderers
+        userBudgetTable.getColumnModel().getColumn(3).setCellRenderer(new ProgressBarRenderer());
+        userBudgetTable.getColumnModel().getColumn(4).setCellRenderer(new ButtonRenderer());
+        userBudgetTable.getColumnModel().getColumn(4).setCellEditor(new ButtonEditor(new JCheckBox()));
+        
+        // Add table grid line settings
+        userBudgetTable.setShowGrid(true);
+        userBudgetTable.setGridColor(Color.GRAY);
+        userBudgetTable.setIntercellSpacing(new Dimension(1, 1));
+        userBudgetTable.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        
+        JScrollPane userTableScrollPane = new JScrollPane(userBudgetTable);
+        userTableScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        userBudgetsPanel.add(userTableScrollPane, BorderLayout.CENTER);
+        
+        updateUserCategoryTable(userBudgetTable);
+        userPanel.add(userBudgetsPanel, BorderLayout.CENTER);
 
-        // Add "Add Category" button at bottom
+        // Add category button
         JPanel userButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton addButton = new JButton("Add Category");
         addButton.setIcon(UIManager.getIcon("Tree.addIcon"));
         addButton.addActionListener(e -> addNewCategory());
         userButtonPanel.add(addButton);
         userPanel.add(userButtonPanel, BorderLayout.SOUTH);
-        
-        return userPanel;
-    }
-    
-    /**
-     * Creates the AI suggested budget panel
-     * @return Configured AI suggestion panel
-     */
-    private JPanel createAISuggestedPanel() {
-        // Create panel with border layout
+
+        // Right panel - AI suggested allocation (Table version)
         JPanel aiPanel = new JPanel(new BorderLayout());
-        
-        // Create titled border with larger font
         TitledBorder aiBorder = BorderFactory.createTitledBorder("AI Suggested Budget");
-        Font borderFont = new Font(getFont().getName(), Font.BOLD, 16);
-        aiBorder.setTitleFont(borderFont);
-        
-        // Add compound border with padding
+        aiBorder.setTitleFont(new Font(getFont().getName(), Font.BOLD, 16));
         aiPanel.setBorder(BorderFactory.createCompoundBorder(
                 aiBorder,
-                BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING)
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)
         ));
 
-        // Create panel for AI suggestions with vertical box layout
-        aiSuggestedPanel = new JPanel();
-        aiSuggestedPanel.setLayout(new BoxLayout(aiSuggestedPanel, BoxLayout.Y_AXIS));
-        updateAISuggestedPanels();
-
-        // Add scrolling capability
-        JScrollPane aiScrollPane = new JScrollPane(aiSuggestedPanel);
-        aiScrollPane.setBorder(BorderFactory.createEmptyBorder());
-        aiScrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        aiPanel.add(aiScrollPane, BorderLayout.CENTER);
-
-        // Add buttons for manipulating suggestions
-        JPanel aiButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        // Create AI suggestions table
+        aiSuggestedPanel = new JPanel(new BorderLayout());
         
-        // Shuffle button for generating new suggestions
+        // Create table model for AI suggestions
+        DefaultTableModel aiTableModel = new DefaultTableModel() {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // All cells non-editable
+            }
+        };
+        aiTableModel.addColumn("Category");
+        aiTableModel.addColumn("Suggested Budget");
+        aiTableModel.addColumn("Difference");
+
+        JTable aiSuggestionsTable = new JTable(aiTableModel);
+        aiSuggestionsTable.setRowHeight(40);
+        aiSuggestionsTable.getColumnModel().getColumn(0).setPreferredWidth(120);
+        aiSuggestionsTable.getColumnModel().getColumn(1).setPreferredWidth(120);
+        aiSuggestionsTable.getColumnModel().getColumn(2).setPreferredWidth(120);
+        
+        // Add custom renderer for difference column
+        aiSuggestionsTable.getColumnModel().getColumn(2).setCellRenderer(new DifferenceRenderer());
+        
+        // Add table grid line settings
+        aiSuggestionsTable.setShowGrid(true);
+        aiSuggestionsTable.setGridColor(Color.GRAY);
+        aiSuggestionsTable.setIntercellSpacing(new Dimension(1, 1)); 
+        aiSuggestionsTable.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        
+        JScrollPane aiTableScrollPane = new JScrollPane(aiSuggestionsTable);
+        aiTableScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        aiSuggestedPanel.add(aiTableScrollPane, BorderLayout.CENTER);
+        
+        updateAISuggestedTable(aiSuggestionsTable);
+        aiPanel.add(aiSuggestedPanel, BorderLayout.CENTER);
+
+        // Shuffle button for AI suggestions
+        JPanel aiButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton shuffleButton = new JButton("Shuffle Suggestions");
         shuffleButton.setIcon(UIManager.getIcon("Table.descendingSortIcon"));
-        shuffleButton.addActionListener(e -> shuffleAISuggestions());
+        shuffleButton.addActionListener(e -> shuffleAISuggestions(aiSuggestionsTable));
         
-        // Apply button to use AI suggestions
         JButton applyButton = new JButton("Apply Suggestions");
         applyButton.setIcon(UIManager.getIcon("FileView.fileIcon"));
         applyButton.addActionListener(e -> applyAISuggestions());
@@ -206,340 +185,128 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
         aiButtonPanel.add(shuffleButton);
         aiButtonPanel.add(applyButton);
         aiPanel.add(aiButtonPanel, BorderLayout.SOUTH);
+
+        // Add both panels to the content area
+        contentPanel.add(userPanel);
+        contentPanel.add(aiPanel);
+        add(contentPanel, BorderLayout.CENTER);
         
-        return aiPanel;
+        // Register as currency change listener
+        CurrencyManager.getInstance().addCurrencyChangeListener(this);
     }
 
     /**
-     * Updates the user budget category panels with current data
+     * Creates the overall budget progress panel.
+     *
+     * @return the panel displaying overall budget usage
      */
-    private void updateUserCategoryPanels() {
-        userBudgetsPanel.removeAll();
+    private JPanel createOverallBudgetPanel() {
+        JPanel overallPanel = new JPanel(new BorderLayout());
+        double overallPercentage = viewModel.getOverallBudgetPercentage();
+        JLabel overallLabel = new JLabel(String.format("Overall Budget: %.2f%% used", overallPercentage));
+        overallLabel.setFont(new Font(overallLabel.getFont().getName(), Font.BOLD, 14));
+        overallPanel.add(overallLabel, BorderLayout.NORTH);
         
-        // Get current budget and expense data
-        Map<String, Double> budgets = financeData.getCategoryBudgets();
-        Map<String, Double> expenses = financeData.getCategoryExpenses();
+        JProgressBar overallProgressBar = createProgressBar(overallPercentage);
+        overallProgressBar.setPreferredSize(new Dimension(getWidth(), 15));
+        overallPanel.add(overallProgressBar, BorderLayout.CENTER);
         
-        // Create panel for each budget category
+        return overallPanel;
+    }
+
+    /**
+     * Updates the user budget table with the latest budget and expense data.
+     *
+     * @param table the JTable to update
+     */
+    private void updateUserCategoryTable(JTable table) {
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        model.setRowCount(0); // Clear existing rows
+        
+        Map<String, Double> budgets = viewModel.getCategoryBudgets();
+        Map<String, Double> expenses = viewModel.getCategoryExpenses();
+        
         for (String category : budgets.keySet()) {
             double budget = budgets.get(category);
             double expense = expenses.getOrDefault(category, 0.0);
-            
-            // Calculate percentage of budget used
             double percentage = budget > 0 ? (expense / budget) * 100 : 0;
             
-            // Create panel with edit and delete functionality
-            BudgetCategoryPanel categoryPanel = new BudgetCategoryPanel(
-                    category, budget, expense, percentage,
-                    e -> editCategory(category),
-                    e -> deleteCategory(category)
-            );
-            
-            // Add panel and spacing
-            userBudgetsPanel.add(categoryPanel);
-            userBudgetsPanel.add(Box.createVerticalStrut(PADDING));
+            model.addRow(new Object[]{
+                category,
+                currencySymbol + String.format("%.2f", budget),
+                currencySymbol + String.format("%.2f", expense),
+                percentage,
+                "" // Placeholder for action buttons
+            });
         }
-        
-        // Add total budget section at bottom
-        double totalBudget = budgets.values().stream().mapToDouble(Double::doubleValue).sum();
-        double totalExpense = expenses.values().stream().mapToDouble(Double::doubleValue).sum();
-        
-        // Create total panel with top border
-        JPanel totalPanel = new JPanel(new BorderLayout());
-        totalPanel.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Color.GRAY));
-        
-        // Format total with current currency
-        String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
-        String formattedTotal = String.format("<html><b>Total: %s%.2f</b></html>", currencySymbol, totalBudget);
-        JLabel totalLabel = new JLabel(formattedTotal);
-        Font boldFont = new Font(totalLabel.getFont().getName(), Font.BOLD, LABEL_FONT_SIZE);
-        totalLabel.setFont(boldFont);
-        totalPanel.add(totalLabel, BorderLayout.WEST);
-        
-        // Add spacing and total panel
-        userBudgetsPanel.add(Box.createVerticalStrut(PADDING));
-        userBudgetsPanel.add(totalPanel);
-        
-        // Refresh UI
-        revalidate();
-        repaint();
     }
     
     /**
-     * Updates the AI suggested budget panels
+     * Updates the AI suggested budget table with the latest suggestions.
+     *
+     * @param table the JTable to update
      */
-    private void updateAISuggestedPanels() {
-        aiSuggestedPanel.removeAll();
+    private void updateAISuggestedTable(JTable table) {
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        model.setRowCount(0); // Clear existing rows
         
-        // Start with current budgets
-        Map<String, Double> actualBudgets = financeData.getCategoryBudgets();
-        double totalBudget = actualBudgets.values().stream().mapToDouble(Double::doubleValue).sum();
+        // Get actual budgets
+        Map<String, Double> actualBudgets = viewModel.getCategoryBudgets();
         
-        // Generate AI-suggested budget allocation
-        Map<String, Double> suggestedBudgets = generateSuggestedBudgets(actualBudgets, totalBudget);
+        // Create or use existing AI suggestions
+        if (currentSuggestedBudgets == null) {
+            currentSuggestedBudgets = viewModel.generateSuggestedBudgets();
+        }
         
         // Display each category with comparison to actual budget
-        for (String category : suggestedBudgets.keySet()) {
-            double suggestedBudget = suggestedBudgets.get(category);
+        for (String category : currentSuggestedBudgets.keySet()) {
+            double suggestedBudget = currentSuggestedBudgets.get(category);
             double actualBudget = actualBudgets.getOrDefault(category, 0.0);
-            
-            // Calculate difference between suggested and actual
             double difference = suggestedBudget - actualBudget;
             
-            // Create and add panel for this suggestion
-            JPanel categoryPanel = createAISuggestionPanel(category, suggestedBudget, difference);
-            aiSuggestedPanel.add(categoryPanel);
-            aiSuggestedPanel.add(Box.createVerticalStrut(PADDING));
+            model.addRow(new Object[]{
+                category,
+                currencySymbol + String.format("%.2f", suggestedBudget),
+                difference // We'll use a custom renderer for this
+            });
         }
-        
-        // Add total budget section at bottom
-        JPanel totalPanel = new JPanel(new BorderLayout());
-        totalPanel.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Color.GRAY));
-        
-        // Format total with current currency
-        String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
-        String formattedTotal = String.format("<html><b>Total: %s%.2f</b></html>", currencySymbol, totalBudget);
-        JLabel totalLabel = new JLabel(formattedTotal);
-        Font boldFont = new Font(totalLabel.getFont().getName(), Font.BOLD, LABEL_FONT_SIZE);
-        totalLabel.setFont(boldFont);
-        totalPanel.add(totalLabel, BorderLayout.WEST);
-        
-        // Add spacing and total panel
-        aiSuggestedPanel.add(Box.createVerticalStrut(PADDING));
-        aiSuggestedPanel.add(totalPanel);
-        
-        // Refresh UI
-        revalidate();
-        repaint();
     }
     
     /**
-     * Creates a panel for displaying an AI budget suggestion
-     * @param category Budget category name
-     * @param budget Suggested budget amount
-     * @param difference Difference from current budget
-     * @return Configured panel showing the suggestion
-     */
-    private JPanel createAISuggestionPanel(String category, double budget, double difference) {
-        // Create main panel with horiztonal spacing
-        JPanel panel = new JPanel(new BorderLayout(PADDING, 0));
-        
-        // Add border with padding
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Color.LIGHT_GRAY),
-                BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING)
-        ));
-
-        // Get current currency symbol for displaying amounts
-        String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
-        
-        // Left side - Category name and budget amount
-        JPanel leftPanel = new JPanel(new BorderLayout());
-        
-        // Category name with bold font
-        JLabel categoryLabel = new JLabel(category);
-        Font boldFont = new Font(categoryLabel.getFont().getName(), Font.BOLD, LABEL_FONT_SIZE);
-        categoryLabel.setFont(boldFont);
-        leftPanel.add(categoryLabel, BorderLayout.NORTH);
-        
-        // Budget amount with regular font
-        String formattedBudget = String.format("%s%.2f", currencySymbol, budget);
-        JLabel budgetLabel = new JLabel(formattedBudget);
-        Font regularFont = new Font(budgetLabel.getFont().getName(), Font.PLAIN, LABEL_FONT_SIZE);
-        budgetLabel.setFont(regularFont);
-        leftPanel.add(budgetLabel, BorderLayout.SOUTH);
-        
-        panel.add(leftPanel, BorderLayout.WEST);
-        
-        // Right side - Difference indicator
-        JPanel rightPanel = new JPanel(new BorderLayout());
-        
-        // Constants for comparison
-        final double EPSILON = 0.01;  // Threshold for "no change"
-        
-        // Format difference text and determine appropriate color
-        String diffText;
-        Color diffColor;
-        
-        if (Math.abs(difference) < EPSILON) {
-            // No significant change
-            diffText = "No change";
-            diffColor = Color.GRAY;
-        } else if (difference > 0) {
-            // Suggested budget is higher than current
-            diffText = String.format("+%s%.2f", currencySymbol, difference);
-            diffColor = new Color(46, 204, 113); // Green color for increase
-        } else {
-            // Suggested budget is lower than current
-            diffText = String.format("-%s%.2f", currencySymbol, Math.abs(difference));
-            diffColor = new Color(231, 76, 60); // Red color for decrease
-        }
-        
-        // Create and style difference label
-        JLabel diffLabel = new JLabel(diffText);
-        diffLabel.setForeground(diffColor);
-        diffLabel.setFont(boldFont);
-        rightPanel.add(diffLabel, BorderLayout.CENTER);
-        
-        panel.add(rightPanel, BorderLayout.EAST);
-        
-        return panel;
-    }
-    
-    /**
-     * Generates suggested budget allocations based on current budgets
-     * @param currentBudgets Current budget allocations
-     * @param totalBudget Total budget amount
-     * @return Map of suggested budget allocations
-     */
-    private Map<String, Double> generateSuggestedBudgets(Map<String, Double> currentBudgets, double totalBudget) {
-        // Create result map
-        Map<String, Double> suggestedBudgets = new LinkedHashMap<>();
-        
-        // Build string representation of current budgets for AI prompt
-        StringBuilder budgetBuilder = new StringBuilder();
-        for (Map.Entry<String, Double> entry : currentBudgets.entrySet()) {
-            budgetBuilder.append(entry.getKey())
-                .append(": ")
-                .append(entry.getValue())
-                .append("; ");
-        }
-        
-        // Remove trailing separator if present
-        if (budgetBuilder.length() >= 2) {
-            budgetBuilder.setLength(budgetBuilder.length() - 2);  // Remove final "; "
-        }
-        
-        // Get current budget allocation as string
-        String budgetString = budgetBuilder.toString();
-        System.out.println(budgetString);
-        
-        // Format prompt for AI suggesting budget reallocation
-        String aiPrompt = String.format(
-            "当前预算分配如下：%s。总预算为 %.2f。"
-          + " 请在总金额不变的情况下，将总预算在各类中重新分配，给出一个更合理的预算分配方案。"
-          + " 请以 JSON 格式输出，键是类别名称，值是对应金额，此外不要输出其它任何内容。",
-            budgetString,
-            totalBudget
-        );
-
-        try {
-            // API key for AI service
-            String API_KEY = "sk-fdf26a37926f46ab8d4884c2cd533db8";
-            
-            // Get response from AI service
-            String response = new getRes().getResponse(API_KEY, aiPrompt);
-            
-            // Parse AI response
-            String jsonResponse = new getRes().parseAIResponse(response);
-            System.out.println(jsonResponse);
-            
-            // Clean up response text
-            jsonResponse = cleanupAIResponse(jsonResponse);
-            
-            // Parse JSON into budget allocations
-            JSONObject json = new JSONObject(jsonResponse);
-            
-            // For each existing category, get suggestion or keep current
-            for (String category : currentBudgets.keySet()) {
-                double suggestedValue = json.has(category)
-                        ? json.getDouble(category)
-                        : currentBudgets.get(category);
-                suggestedBudgets.put(category, suggestedValue);
-            }
-        } catch (Exception e) {
-            // Log error and fall back to current budgets
-            System.err.println("AI 建议生成失败: " + e.getMessage());
-            suggestedBudgets = new HashMap<>(currentBudgets);
-        }
-        
-        return suggestedBudgets;
-    }
-    
-    /**
-     * Cleans up AI response text to extract JSON content
-     * @param response Raw AI response text
-     * @return Cleaned JSON string
-     */
-    private String cleanupAIResponse(String response) {
-        // 1. Trim whitespace
-        String result = response.trim();
-
-        // 2. Remove opening code block markers and language identifier
-        if (result.startsWith("```")) {
-            int firstNewline = result.indexOf('\n');
-            if (firstNewline != -1) {
-                result = result.substring(firstNewline + 1).trim();
-            } else {
-                result = "";
-            }
-        }
-        
-        // 3. Remove closing code block markers
-        if (result.endsWith("```")) {
-            int lastBackticks = result.lastIndexOf("```");
-            result = result.substring(0, lastBackticks).trim();
-        }
-
-        // 4. Remove "json" prefix if present
-        if (result.startsWith("json")) {
-            int braceIndex = result.indexOf('{');
-            if (braceIndex != -1) {
-                result = result.substring(braceIndex).trim();
-            }
-        }
-        
-        return result;
-    }
-    
-    /**
-     * Creates a progress bar for showing budget usage
-     * @param percentage Usage percentage (0-100)
-     * @return Configured progress bar
+     * Creates a progress bar with color coding based on percentage value.
+     *
+     * @param percentage the percentage value (0-100)
+     * @return a configured JProgressBar
      */
     private JProgressBar createProgressBar(double percentage) {
-        // Create progress bar with proper range
         JProgressBar progressBar = new JProgressBar(0, 100);
         progressBar.setValue((int) percentage);
         progressBar.setStringPainted(true);
         
-        // Set color based on percentage value
+        // Set color based on percentage
         if (percentage < 80) {
-            // Below 80% - Good (green)
-            progressBar.setForeground(new Color(46, 204, 113));
+            progressBar.setForeground(new Color(46, 204, 113)); // Green
         } else if (percentage < 100) {
-            // 80-100% - Warning (yellow)
-            progressBar.setForeground(new Color(241, 196, 15));
+            progressBar.setForeground(new Color(241, 196, 15)); // Yellow
         } else {
-            // Over 100% - Overspent (red)
-            progressBar.setForeground(new Color(231, 76, 60));
+            progressBar.setForeground(new Color(231, 76, 60)); // Red
         }
         
         return progressBar;
     }
     
     /**
-     * Opens dialog to add a new budget category
+     * Opens a dialog to add a new budget category and updates the model if confirmed.
      */
     private void addNewCategory() {
-        // Get current currency for display
-        String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
-
-        // Show dialog to collect category and budget amount
         BudgetDialog dialog = new BudgetDialog(SwingUtilities.getWindowAncestor(this), "Add Category", "", 0.0);
         if (dialog.showDialog()) {
-            // Get user input
             String category = dialog.getCategory();
             double budget = dialog.getBudget();
             
-            // Update data model and save to file
-            financeData.updateCategoryBudget(category, budget);
+            // Update through view model
+            viewModel.updateCategoryBudget(category, budget);
             
-            // Refresh UI
-            updateUserCategoryPanels();
-            updateAISuggestedPanels();
-            
-            // Show confirmation message
             JOptionPane.showMessageDialog(this, 
                     "New category added: " + category + " Budget: " + currencySymbol + budget,
                     "Category Added", 
@@ -548,17 +315,12 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
     }
     
     /**
-     * Opens dialog to edit an existing budget category
-     * @param category Category name to edit
+     * Opens a dialog to edit a budget category and updates the model if confirmed.
+     *
+     * @param category the name of the category to edit
      */
     private void editCategory(String category) {
-        // Get current currency for display
-        String currencySymbol = CurrencyManager.getInstance().getCurrencySymbol();
-
-        // Get current budget for this category
-        double currentBudget = financeData.getCategoryBudget(category);
-        
-        // Show dialog pre-filled with current values
+        double currentBudget = viewModel.getCategoryBudget(category);
         BudgetDialog dialog = new BudgetDialog(
                 SwingUtilities.getWindowAncestor(this), 
                 "Edit Category", 
@@ -566,17 +328,11 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
                 currentBudget);
         
         if (dialog.showDialog()) {
-            // Get updated budget amount
             double newBudget = dialog.getBudget();
             
-            // Update data model and save to file
-            financeData.updateCategoryBudget(category, newBudget);
+            // Update through view model
+            viewModel.updateCategoryBudget(category, newBudget);
             
-            // Refresh UI
-            updateUserCategoryPanels();
-            updateAISuggestedPanels();
-            
-            // Show confirmation message
             JOptionPane.showMessageDialog(this, 
                     "Category updated: " + category + " New budget: " + currencySymbol + newBudget,
                     "Category Updated", 
@@ -585,11 +341,11 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
     }
     
     /**
-     * Deletes an existing budget category after confirmation
-     * @param category Category name to delete
+     * Shows a confirmation dialog and deletes a budget category if confirmed.
+     *
+     * @param category the name of the category to delete
      */
     private void deleteCategory(String category) {
-        // Show confirmation dialog
         int result = JOptionPane.showConfirmDialog(
                 this,
                 "Are you sure you want to delete category: " + category + "?",
@@ -599,15 +355,8 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
         );
         
         if (result == JOptionPane.YES_OPTION) {
-            // Delete from data model and save to file
-            boolean success = financeData.deleteCategoryBudget(category);
-            
-            if (success) {
-                // Refresh UI
-                updateUserCategoryPanels();
-                updateAISuggestedPanels();
-                
-                // Show confirmation message
+            // Delete through view model
+            if (viewModel.deleteCategoryBudget(category)) {
                 JOptionPane.showMessageDialog(this, 
                         "Category deleted: " + category,
                         "Category Deleted", 
@@ -617,13 +366,15 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
     }
     
     /**
-     * Generates new AI budget suggestions
+     * Generates new AI budget suggestions and updates the suggestions table.
+     *
+     * @param aiTable the JTable to update with new suggestions
      */
-    private void shuffleAISuggestions() {
-        // Generate new suggestions and update UI
-        updateAISuggestedPanels();
+    private void shuffleAISuggestions(JTable aiTable) {
+        // Generate new suggestions through view model
+        currentSuggestedBudgets = viewModel.generateSuggestedBudgets();
+        updateAISuggestedTable(aiTable);
         
-        // Show confirmation message
         JOptionPane.showMessageDialog(this,
                 "New AI budget suggestions generated!",
                 "Suggestions Updated",
@@ -631,103 +382,213 @@ public class BudgetsPanel extends JPanel implements CurrencyChangeListener, Data
     }
     
     /**
-     * Applies the current AI suggestions to the user's budget
+     * Applies the current AI suggested budgets to the user's budget allocation.
+     * Shows a confirmation dialog before applying.
      */
     private void applyAISuggestions() {
-        // Show confirmation dialog
         int result = JOptionPane.showConfirmDialog(
                 this,
-                "Are you sure you want to apply the AI-suggested budget allocation to your budget?",
+                "Are you sure you want to apply AI suggested budget allocations to your budget?",
                 "Apply AI Suggestions",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE
         );
         
         if (result == JOptionPane.YES_OPTION) {
-            // Get current budgets and total
-            Map<String, Double> actualBudgets = financeData.getCategoryBudgets();
-            double totalBudget = actualBudgets.values().stream().mapToDouble(Double::doubleValue).sum();
+            // Apply suggestions through view model
+            viewModel.applySuggestedBudgets(currentSuggestedBudgets);
             
-            // Generate AI suggestions
-            Map<String, Double> suggestedBudgets = generateSuggestedBudgets(actualBudgets, totalBudget);
-            
-            // Apply each suggestion to data model
-            for (Map.Entry<String, Double> entry : suggestedBudgets.entrySet()) {
-                financeData.updateCategoryBudget(entry.getKey(), entry.getValue());
-            }
-            
-            // Refresh UI
-            updateUserCategoryPanels();
-            updateAISuggestedPanels();
-            
-            // Show confirmation message
             JOptionPane.showMessageDialog(this,
-                    "AI-suggested budget has been applied to your budget allocation!",
+                    "AI suggested budgets have been applied to your budget allocation!",
                     "Suggestions Applied",
                     JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
     /**
-     * Loads transaction data from CSV file
-     */
-    private void loadTransactionData() {
-        // Build path to user-specific transaction file
-        String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
-        
-        // Import transactions from CSV
-        List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
-
-        if (!transactions.isEmpty()) {
-            // Update finance data with imported transactions
-            financeData.importTransactions(transactions);
-            System.out.println("Successfully imported " + transactions.size() + " transactions");
-        } else {
-            System.err.println("No transactions were imported");
-        }
-    }
-
-    /**
-     * Handles currency change events
+     * Called when the application currency changes.
+     * Updates all tables to use the new currency symbol.
+     *
+     * @param currencyCode the new currency code
+     * @param currencySymbol the new currency symbol
      */
     @Override
     public void onCurrencyChanged(String currencyCode, String currencySymbol) {
-        // Refresh both panels when currency changes
-        updateUserCategoryPanels();
-        updateAISuggestedPanels();
+        this.currencySymbol = currencySymbol;
+        // Update tables when currency changes
+        updateUserCategoryTable((JTable)((JScrollPane)userBudgetsPanel.getComponent(0)).getViewport().getView());
+        updateAISuggestedTable((JTable)((JScrollPane)aiSuggestedPanel.getComponent(0)).getViewport().getView());
     }
 
     /**
-     * Handles data refresh events
+     * Called when budget data changes in the view model.
+     * Updates all tables to reflect the latest data.
      */
     @Override
-    public void onDataRefresh(DataRefreshManager.RefreshType type) {
-        // Check refresh type
-        if (type == DataRefreshManager.RefreshType.BUDGETS || 
-            type == DataRefreshManager.RefreshType.TRANSACTIONS || 
-            type == DataRefreshManager.RefreshType.ALL) {
-            
-            // Reload transaction data if needed
-            if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
-                type == DataRefreshManager.RefreshType.ALL) {
-                loadTransactionData();
-            }
-            
-            // Refresh UI components
-            updateUserCategoryPanels();
-            updateAISuggestedPanels();
-        }
+    public void onBudgetDataChanged() {
+        // Update UI when view model notifies of data changes
+        updateUserCategoryTable((JTable)((JScrollPane)userBudgetsPanel.getComponent(0)).getViewport().getView());
+        updateAISuggestedTable((JTable)((JScrollPane)aiSuggestedPanel.getComponent(0)).getViewport().getView());
     }
 
     /**
-     * Unregisters listeners when component is removed
+     * Called when this panel is removed from its container.
+     * Cleans up listeners and resources.
      */
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // Clean up by removing listeners
-        DataRefreshManager.getInstance().removeListener(this);
+        // Clean up when panel is removed
         CurrencyManager.getInstance().removeCurrencyChangeListener(this);
+        viewModel.removeBudgetChangeListener(this);
+        viewModel.cleanup();
+    }
+    
+    // Custom renderer classes
+    
+    /**
+     * Progress bar renderer for the usage column in the budget table.
+     */
+    class ProgressBarRenderer extends JProgressBar implements TableCellRenderer {
+        public ProgressBarRenderer() {
+            super(0, 100);
+            setStringPainted(true);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                     boolean isSelected, boolean hasFocus,
+                                                     int row, int column) {
+            double percentage = (Double) value;
+            setValue((int) percentage);
+            
+            // Set color based on percentage
+            if (percentage < 80) {
+                setForeground(new Color(46, 204, 113)); // Green
+            } else if (percentage < 100) {
+                setForeground(new Color(241, 196, 15)); // Yellow
+            } else {
+                setForeground(new Color(231, 76, 60));  // Red
+            }
+            
+            setString(String.format("%.2f%%", percentage));
+            return this;
+        }
+    }
+
+    /**
+     * Button renderer for the actions column in the budget table.
+     */
+    class ButtonRenderer extends JPanel implements TableCellRenderer {
+        private JButton editButton;
+        private JButton deleteButton;
+        
+        public ButtonRenderer() {
+            setLayout(new GridLayout(1, 2, 5, 0));
+            editButton = new JButton("Edit");
+            deleteButton = new JButton("Delete");
+            add(editButton);
+            add(deleteButton);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                    boolean isSelected, boolean hasFocus,
+                                                    int row, int column) {
+            return this;
+        }
+    }
+
+    /**
+     * Button editor for handling edit and delete actions in the budget table.
+     */
+    class ButtonEditor extends DefaultCellEditor {
+        protected JPanel panel;
+        protected JButton editButton;
+        protected JButton deleteButton;
+        private String category;
+        
+        public ButtonEditor(JCheckBox checkBox) {
+            super(checkBox);
+            panel = new JPanel(new GridLayout(1, 2, 5, 0));
+            editButton = new JButton("Edit");
+            deleteButton = new JButton("Delete");
+
+            editButton.addActionListener(e -> {
+                fireEditingStopped();
+                // Get current row's category
+                editCategory(category);
+            });
+            
+            deleteButton.addActionListener(e -> {
+                fireEditingStopped();
+                // Get current row's category
+                deleteCategory(category);
+            });
+            
+            panel.add(editButton);
+            panel.add(deleteButton);
+        }
+        
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value,
+                                                  boolean isSelected, int row, int column) {
+            // Get current row's category
+            category = (String) table.getValueAt(row, 0);
+            return panel;
+        }
+        
+        @Override
+        public Object getCellEditorValue() {
+            return "";
+        }
+    }
+    
+    /**
+     * Renderer for the difference column in the AI suggestions table.
+     * Displays the difference with color coding and formatting.
+     */
+    class DifferenceRenderer extends JLabel implements TableCellRenderer {
+        public DifferenceRenderer() {
+            setOpaque(true);
+            setHorizontalAlignment(JLabel.CENTER);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                    boolean isSelected, boolean hasFocus,
+                                                    int row, int column) {
+            double difference = (Double) value;
+            
+            // Format difference display
+            String diffText;
+            Color diffColor;
+            
+            if (Math.abs(difference) < 0.01) {
+                diffText = "No change";
+                diffColor = Color.GRAY;
+            } else if (difference > 0) {
+                diffText = String.format("+%s%.2f", currencySymbol, difference);
+                diffColor = new Color(46, 204, 113); // Green
+            } else {
+                diffText = String.format("-%s%.2f", currencySymbol, Math.abs(difference));
+                diffColor = new Color(231, 76, 60); // Red
+            }
+            
+            setText(diffText);
+            setForeground(diffColor);
+            setFont(new Font(getFont().getName(), Font.BOLD, 12));
+            
+            return this;
+        }
+    }
+
+    /**
+     * Returns the ViewModel associated with this panel.
+     * @return the BudgetViewModel instance
+     */
+    BudgetViewModel getViewModel() {
+        return viewModel;
     }
 }
 

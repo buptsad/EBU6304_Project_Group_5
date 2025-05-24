@@ -13,20 +13,46 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.logging.Logger;
 
+/**
+ * A panel that displays a financial overview including charts and detailed statistics.
+ * This component follows the MVVM pattern to display user's financial information.
+ * <p>
+ * The panel is divided into two sections using a JSplitPane:
+ * <ul>
+ *   <li>Left side: Financial chart showing income, expenses, and budget trends</li>
+ *   <li>Right side: Detailed financial information and personalized advice</li>
+ * </ul>
+ 
+ * <p>
+ * This panel implements the OverviewChangeListener interface to respond to changes
+ * in the underlying financial data and update the UI accordingly.
+ 
+ */
 public class OverviewPanel extends JPanel implements OverviewChangeListener {
+    /** Logger for this class */
     private static final Logger LOGGER = Logger.getLogger(OverviewPanel.class.getName());
     
-    // View components
+    /** Panel containing the financial chart */
     private JPanel chartPanel;
+    
+    /** Panel containing detailed financial information */
     private FinancialDetailsPanel detailsPanel;
     
-    // ViewModels
+    /** View model for the overview panel */
     private final OverviewViewModel viewModel;
+    
+    /** View model for the financial details panel */
     private FinancialDetailsViewModel detailsViewModel;
     
-    // Static instance for access across the application
+    /** Shared financial advice instance accessible across the application */
     public static FinancialAdvice sharedAdvice = new FinancialAdvice();
     
+    /**
+     * Creates a new overview panel for the specified user.
+     * Initializes view models and UI components for financial overview display.
+     *
+     * @param username the username of the current user
+     */
     public OverviewPanel(String username) {
         // Initialize ViewModels
         FinanceData financeData = new FinanceData();
@@ -59,6 +85,12 @@ public class OverviewPanel extends JPanel implements OverviewChangeListener {
         add(splitPane, BorderLayout.CENTER);
     }
     
+    /**
+     * Creates a panel containing the financial chart.
+     * The chart displays income, expenses, and budget trends using data from the view model.
+     *
+     * @return a panel containing the configured financial chart
+     */
     private JPanel createChartPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createCompoundBorder(
@@ -81,8 +113,10 @@ public class OverviewPanel extends JPanel implements OverviewChangeListener {
         return panel;
     }
     
-    // Implementation of OverviewChangeListener interface
-    
+    /**
+     * Called when financial data changes in the view model.
+     * Updates both the chart and the details panel to reflect the changes.
+     */
     @Override
     public void onFinancialDataChanged() {
         // Get the split pane
@@ -103,6 +137,12 @@ public class OverviewPanel extends JPanel implements OverviewChangeListener {
         splitPane.repaint();
     }
     
+    /**
+     * Called when budget warnings are detected by the view model.
+     * Displays a warning dialog with the specified message.
+     *
+     * @param warningMessage the warning message to display
+     */
     @Override
     public void onBudgetWarningsDetected(String warningMessage) {
         // Show warning dialog with the message from ViewModel
@@ -114,6 +154,10 @@ public class OverviewPanel extends JPanel implements OverviewChangeListener {
         dialog.setVisible(true);
     }
     
+    /**
+     * Called when this panel is removed from its container.
+     * Performs necessary cleanup by removing listeners and releasing resources.
+     */
     @Override
     public void removeNotify() {
         super.removeNotify();

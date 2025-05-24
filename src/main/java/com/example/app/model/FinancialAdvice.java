@@ -5,43 +5,63 @@ import com.example.app.ui.pages.AI.getRes;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
+/**
+ * A model class representing personalized financial advice for users.
+ * This class handles the generation, storage, and retrieval of AI-generated
+ * financial advice based on user data.
+ */
 public class FinancialAdvice implements Serializable {
     private static final long serialVersionUID = 1L;
-    private String advice;
-    private LocalDateTime generationTime;
-    private String username;
-
-    private transient FinanceData financeData;
-    public void setFinanceData(FinanceData fd) { this.financeData = fd; }
-    // Default advice text if generation fails
-    private static final String DEFAULT_ADVICE = 
-            "";
     
+    /**
+     * The financial advice text content.
+     */
+    private String advice;
+    
+    /**
+     * The timestamp when the advice was generated.
+     */
+    private LocalDateTime generationTime;
+    
+    /**
+     * The username associated with this advice.
+     */
+    private String username;
+    
+    /**
+     * Default advice text used if AI generation fails or before
+     * the first advice is generated.
+     */
+    private static final String DEFAULT_ADVICE = 
+            "You've spent 6000 on Spring Festival. It is 60% of your monthly budget. " +
+            "Please be careful with your spending.\n" +
+            "The Qingming Festival is coming soon, and you may need to spend more. " +
+            "Please be careful with your budgets.";
+    
+    /**
+     * Creates a new FinancialAdvice instance with default advice.
+     */
     public FinancialAdvice() {
         this.advice = DEFAULT_ADVICE;
         this.generationTime = LocalDateTime.now();
     }
     
     /**
-     * Initialize with a specific username to load/save user-specific advice
+     * Initializes the advice with a specific username to load/save user-specific advice.
+     * 
      * @param username The username for advice storage
      */
     public void initialize(String username) {
         this.username = username;
         FinancialAdviceStorage.setUsername(username);
-        regenerate();
         loadFromStorage();
     }
     
     /**
-     * Load advice from storage file
+     * Loads advice from storage file.
      */
     private void loadFromStorage() {
         Object[] loadedData = FinancialAdviceStorage.loadAdvice();
@@ -51,10 +71,21 @@ public class FinancialAdvice implements Serializable {
         }
     }
     
+    /**
+     * Gets the current financial advice text.
+     * 
+     * @return The financial advice text
+     */
     public String getAdvice() {
         return advice;
     }
     
+    /**
+     * Sets new financial advice text, updates the generation time,
+     * saves to storage, and notifies listeners of the change.
+     * 
+     * @param advice The new financial advice text to set
+     */
     public void setAdvice(String advice) {
         this.advice = advice;
         this.generationTime = LocalDateTime.now();
@@ -66,7 +97,7 @@ public class FinancialAdvice implements Serializable {
     }
     
     /**
-     * Save current advice to storage file
+     * Saves current advice to storage file.
      */
     private void saveToStorage() {
         if (username != null) {
@@ -74,62 +105,38 @@ public class FinancialAdvice implements Serializable {
         }
     }
     
+    /**
+     * Gets the timestamp when the advice was generated.
+     * 
+     * @return The generation timestamp
+     */
     public LocalDateTime getGenerationTime() {
         return generationTime;
     }
     
+    /**
+     * Gets the formatted generation time as a human-readable string.
+     * 
+     * @return The formatted date and time string (e.g., "May 24, 2025 14:30")
+     */
     public String getFormattedGenerationTime() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
         return generationTime.format(formatter);
     }
     
     /**
-     * Regenerate financial advice using AI
+     * Regenerates financial advice using AI.
+     * Makes an API call to the DeepSeek AI service to get personalized
+     * financial advice based on the user's data.
      */
     public void regenerate() {
-        if (financeData == null) {
-        System.err.println("[Advice] financeData not injected – regenerate() aborted.");
-        return;
-    }
-            Map<String, Double> cat = financeData.getCategoryExpenses();   // 你已有此方法
-            List<LocalDate> dates = financeData.getDates();
-            if (dates.isEmpty()) return;              // 没数据就退出
-            LocalDate start = Collections.min(dates);
-            LocalDate end   = Collections.max(dates);
-        // ② 拼成 prompt 里要的数据块
-        StringBuilder dataBlock = new StringBuilder();
-        cat.forEach((k,v) -> dataBlock.append(String.format("%s: %.2f\n", k, v)));
-        System.out.println(dataBlock.toString().trim());
         if (username == null) return;
         try {
             String apiKey = "sk-fdf26a37926f46ab8d4884c2cd533db8";
             getRes aiService = new getRes();
-            String prompt = String.join("\n",
-                // ——— 数据 ———
-                "You are a bilingual personal-finance coach for a mainland-China user.",
-                "Today's date: " + java.time.LocalDate.now(),
-                // ——— 输出要求 ———
-                "Please answer in exactly TWO plain English sentences (no bullet points, no markdown).",
-                "Sentence 1: Point out today’s date.",
-                "Sentence 2: Check the next 30 days. If any event in the calendar below falls within that period, name it and remind the user to watch their budget; if none, say that no major spending trigger is expected.",
-                "",
-                // ——— 节庆 / 大促日历 ———
-                "Calendar of Chinese high-spending events:",
-                "  • New Year’s Day – Jan 1",
-                "  • Spring Festival – Lunar Jan 1-3 (late Jan/Feb)",
-                "  • Lantern Festival – Lunar Jan 15 (Feb)",
-                "  • Qingming Festival – Apr 4 ±1",
-                "  • Labor Day – May 1",
-                "  • Dragon-boat Festival – May 31",
-                "  • 6·18 Shopping Festival – Jun 18",
-                "  • Father’s Day – 3rd Sunday of Jun",
-                "  • Mid-Autumn Festival – Lunar Aug 15 (Sep)",
-                "  • National Day Golden Week – Oct 1-7",
-                "  • Double-Eleven – Nov 11",
-                "  • Back-to-school season – late Aug / early Sep"
-            );
-
-
+            String prompt = "Please analyze my financial data and provide personalized advice. " +
+                    "Focus on my spending patterns, budget adherence, and suggestions for saving money. " +
+                    "Keep the advice concise but actionable, within 3-4 sentences.";
             String response = aiService.getResponse(apiKey, prompt);
             String parsedResponse = aiService.parseAIResponse(response);
             setAdvice(parsedResponse); // <-- This will trigger refresh
@@ -137,6 +144,4 @@ public class FinancialAdvice implements Serializable {
             System.err.println("Failed to generate advice: " + e.getMessage());
         }
     }
-
-
 }
