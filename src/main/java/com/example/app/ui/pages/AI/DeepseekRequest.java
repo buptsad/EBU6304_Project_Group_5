@@ -1,4 +1,5 @@
 package com.example.app.ui.pages.AI;
+
 import lombok.Data;
 import lombok.Builder;
 import java.util.List;
@@ -16,7 +17,7 @@ public class DeepseekRequest {
      * For example: "deepseek-chat"
      */
     private String model;
-    
+
     /**
      * List of message objects that comprise the conversation history.
      * These messages provide context for the AI to generate responses.
@@ -32,10 +33,11 @@ public class DeepseekRequest {
     public static class Message {
         /**
          * The role of the message sender.
-         * Common values include "user" for user messages and "assistant" for AI responses.
+         * Common values include "user" for user messages and "assistant" for AI
+         * responses.
          */
         private String role;
-        
+
         /**
          * The actual content/text of the message.
          */
