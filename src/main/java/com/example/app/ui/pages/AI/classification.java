@@ -16,8 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Classification utility for financial transactions using DeepSeek AI API.
- * Categorizes transactions into predefined categories: Gift, Entertainment,
- * Service, Shopping, Other, and Food.
+ * Categorizes transactions into predefined categories: Gift, Entertainment, Service, Shopping, Other, and Food.
  */
 public class classification {
 
@@ -33,14 +32,14 @@ public class classification {
      * DeepSeek API endpoint URL
      */
     private static final String API_URL = "https://api.deepseek.com/v1/chat/completions";
-
+    
     /**
      * DeepSeek API Key - Keep this private and secure!
      */
     private static String API_KEY = "sk-fdf26a37926f46ab8d4884c2cd533db8";
-
+    
     private final RestTemplate restTemplate = new RestTemplate();
-
+    
     /**
      * Sends a request to the DeepSeek API to classify transaction data.
      * 
@@ -51,9 +50,8 @@ public class classification {
      */
     public String getResponse(String apiKey, String prompt) throws IOException {
         // Build request body
-
-        prompt = "请你根据以下的账单信息，将这些交易中的每丢�笔交易归于{Gift,Entertainment,Service,Shopping,Other,Food}中的丢�类��示例输入如下：2025-04-14,风味餐厅,商户消费,-15.00\r\n2025-04-14,微信转账,红包,12.00\r\n\r\n示例输出字符串如下，类别中间以��号隔开：Food,Other，如果不属于任何类别归类为Other.除此之外不允许包含其它任何的内容"
-                + prompt;
+        
+        prompt = "请你根据以下的账单信息，将这些交易中的每一笔交易归于{Gift,Entertainment,Service,Shopping,Other,Food}中的一类。示例输入如下：2025-04-14,风味餐厅,商户消费,-15.00\r\n2025-04-14,微信转账,红包,12.00\r\n\r\n示例输出字符串如下，类别中间以逗号隔开：Food,Other，如果不属于任何类别归类为Other.除此之外不允许包含其它任何的内容" + prompt;
         DeepseekRequest.Message message = DeepseekRequest.Message.builder()
                 .role("user")
                 .content(prompt)
@@ -81,9 +79,9 @@ public class classification {
         if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
             return responseEntity.getBody();
         }
-        throw new IOException("Unexpected status code");
+        throw new IOException("Unexpected status code" );
     }
-
+    
     /**
      * Extracts the content from the DeepSeek API JSON response.
      * 
