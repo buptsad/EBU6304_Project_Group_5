@@ -1,5 +1,6 @@
 .gradle
 **/build/
+build
 !src/**/build/
 
 # Ignore Gradle GUI config
@@ -20,7 +21,12 @@ gradle-app.setting
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 
-build
-bin
-gradle
 .vscode
+
+# ignore built files
+bin
+
+# ignore gradlew and gradlew.bat files
+gradlew
+gradlew.bat
+gradle

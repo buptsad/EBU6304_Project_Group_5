@@ -1,153 +1,109 @@
 # AI-Empowered Personal Finance Tracker
 
-## Project Overview
+## Overview
 
-This project is an AI-Empowered Personal Finance Tracker developed as part of the EBU6304 - Software Engineering Group Project. The application helps users track expenses, set savings goals, and analyze spending habits using AI. It integrates both automated data processing and manual validation to ensure accuracy while adapting to regional spending patterns and economic conditions.
+This is a Java-based personal finance tracker enhanced with AI features. It provides a modern UI, charting, and REST capabilities.
 
-## Features
+---
 
-### Manual & Automated Data Entry
-- Users can manually input transactions through forms
-- Supports CSV file import for bulk data entry
-- Sample data is provided for demonstration purposes
+## Prerequisites
 
-### Expense Categorization
-- AI automatically classifies transactions into categories
-- Users can manually review and correct categorizations
-- Category management with budgets and expense tracking
+- **Java 17** or newer (JDK)
+- **Gradle 8.8-8.14** (pure Gradle, no wrapper)
+- **Git** (optional, for version control)
 
-### Spending Insights & Predictions
-- Generates financial reports and visualizations
-- Provides budget progress tracking
-- Includes AI-powered financial advice and predictions
+---
 
-### Local Financial Context
-- Customizable to regional budgeting habits
-- Detects seasonal spending patterns
-- Adapts to local economic conditions
+## Setup & Build
 
-### User Interface
-- Dashboard with financial summaries and charts
-- Navigation between different financial management sections
-- Settings for theme and currency preferences
+1. **Clone the repository** (if you haven't already):
 
-## Technical Implementation
+    ```
+    git clone https://github.com/buptsad/EBU6304_Project_Group_5
+    cd EBU6304_Project_Group_5
+    ```
 
-### Architecture
-- Stand-alone Java application with Swing GUI
-- Modular design with separate packages for model, view, and controller components
-- Uses JFreeChart for data visualization
-- Implements currency management and theme settings
+2. **Build the project** (downloads dependencies and compiles code):
 
-### Key Classes
-- `Main`: Application entry point
-- `LoginFrame`: User authentication interface
-- `MainFrame`: Main application window with navigation
-- `FinanceData`: Manages financial data and calculations
-- `ChineseHolidayCalendar`: Handles local holiday calculations
-- `CurrencyManager`: Manages currency settings and conversions
-- `ThemeManager`: Manages application theme settings
-- `DashboardPanel`: Main dashboard interface
-- `TransactionsPanel`: Transaction management interface
-- `BudgetsPanel`: Budget management interface
-- `ReportsPanel`: Financial reports interface
-- `AIPanel`: AI assistant interface
-- `SettingsPanel`: Application settings interface
+    ```
+    gradle build
+    ```
 
-### Data Management
-- Uses in-memory data structures for demonstration
-- Supports CSV import/export for data persistence
-- No external database required
+---
 
 ## Running the Application
 
-### Prerequisites
-- Java Development Kit (JDK) 11 or later
-- Required libraries: FlatLaf, JFreeChart, Hutool
+You can run the application using Gradle:
 
-### Compilation and Execution
-1. Compile all Java files using your preferred IDE or command-line compiler
-2. Run the `Main` class to start the application
+```
+gradle run
+```
+
+Or run the generated JAR file (after building):
+
+```
+java -jar Mini_project_test-1.0-SNAPSHOT.jar
+```
+
+For usage manual, see `user manual.docx`
+
+---
+
+## Javadoc Documentation
+
+The Javadoc has already been generated and is included in the repository.
+
+To view the documentation, open:  
+`doc/index.html`
+
+If you wish to regenerate the documentation:
+
+```
+gradle javadoc
+```
+
+---
 
 ## Testing
+All the test codes lies in `src/test`, each in the same folder as the code to be tested in the main source code.
 
-### Test Strategy
-- Unit testing for core functionality
-- Integration testing for component interactions
-- User acceptance testing for UI and workflow validation
+To run all tests:
 
-### Test Cases
-- Login functionality validation
-- Transaction creation and management
-- Budget setting and tracking
-- Report generation accuracy
-- CSV import/export functionality
-- Currency conversion correctness
-- Theme switching functionality
+```
+gradle test
+```
 
-## User Manual
+---
 
-### Getting Started
-1. Launch the application
-2. Log in using default credentials (for demonstration purposes)
-3. Navigate through the dashboard to view financial summaries
-4. Use the navigation bar to access different features
+## Configuration
 
-### Managing Transactions
-- Add new transactions manually through forms
-- Import transactions from CSV files
-- View and edit existing transactions
-- Filter and search transactions
+- The main class is: `com.example.app.Main`
+- Dependencies are managed in build.gradle
+- No additional configuration is required for basic usage.
 
-### Managing Budgets
-- Set budgets for different categories
-- Track spending against budgets
-- View budget progress visualizations
-- Receive budget alerts when approaching limits
+---
 
-### Viewing Reports
-- Generate income vs expenses reports
-- View category breakdowns
-- Analyze spending trends
-- Customize report time periods and intervals
+## Troubleshooting
 
-### Using AI Features
-- Get financial advice from the AI assistant
-- Receive spending pattern analysis
-- Obtain personalized savings recommendations
+- Ensure your `JAVA_HOME` points to a compatible JDK (Java 17+).
+- If you encounter issues with UI on headless systems, uncomment the `java.awt.headless` property in build.gradle.
 
-### Customizing Settings
-- Switch between light and dark themes
-- Change currency display preferences
-- Manage application notifications
-- Update security settings
+---
 
-## Project Management
+## License
 
-### Agile Methodology
-- Scrum framework with daily standups
-- Sprint planning and retrospectives
-- User stories and acceptance criteria
-- Continuous integration and delivery
+This project is part of academic coursework and is protected by the following license:
 
-### Version Control
-- GitHub for code repository and collaboration
-- Branching strategy for feature development
-- Pull requests for code reviews
-- Issue tracking for bug reporting and feature requests
+### Restricted Academic License
 
-## Future Enhancements
+**Until June 30, 2025:**
+All rights reserved. This software and associated documentation files may not be copied, modified, distributed, or used in any manner without explicit written permission from the authors.
 
-- Implement machine learning for improved AI predictions
-- Add multi-user support and data synchronization
-- Expand financial analysis capabilities
-- Develop mobile companion application
-- Enhance data security and encryption
+**After June 30, 2025:**
+This software will be released under the MIT License:
 
-## Development Guide
-
-1. Install gradle.
-2. Clone this repo.
-3. Run `gradle wrapper` in the root of the project.
-4. Run `./gradle build` to build this project. For windows, it is `.\gradle.bat build`
-5. Run `./gradle run` to run this project. For windows, it is `.\gradle.bat run`
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
