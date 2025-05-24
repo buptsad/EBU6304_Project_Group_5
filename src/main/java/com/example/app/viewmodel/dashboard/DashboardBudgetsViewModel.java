@@ -10,8 +10,18 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * ViewModel for DashboardBudgetsPanel following MVVM pattern.
+ * ViewModel for DashboardBudgetsPanel following the MVVM pattern.
  * Acts as an intermediary between the DashboardBudgetsPanel (View) and the storage classes.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>Loads and saves budgets and expenses from user storage</li>
+ *   <li>Provides category budget and expense data for the view</li>
+ *   <li>Listens for data refresh events and notifies listeners</li>
+ *   <li>Supports registration and removal of budget change listeners</li>
+ *   <li>Handles cleanup of listeners when no longer needed</li>
+ * </ul>
+ 
  */
 public class DashboardBudgetsViewModel implements DataRefreshListener {
     private static final Logger LOGGER = Logger.getLogger(DashboardBudgetsViewModel.class.getName());
@@ -21,12 +31,21 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
     private Map<String, Double> categoryExpenses = new HashMap<>();
 
     /**
-     * Interface for components that need to be notified of budget changes
+     * Listener interface for components that need to be notified of budget changes.
      */
     public interface BudgetChangeListener {
+        /**
+         * Called when the budget data has changed and the view should be refreshed.
+         */
         void onBudgetDataChanged();
     }
 
+    /**
+     * Constructs a DashboardBudgetsViewModel for the specified user.
+     * Initializes storage and loads initial data.
+     *
+     * @param username the username for which to manage budgets
+     */
     public DashboardBudgetsViewModel(String username) {
         this.username = username;
 
@@ -43,7 +62,9 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Add a listener for budget changes
+     * Adds a listener for budget changes.
+     *
+     * @param listener the listener to add
      */
     public void addBudgetChangeListener(BudgetChangeListener listener) {
         if (!listeners.contains(listener)) {
@@ -52,14 +73,16 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Remove a listener
+     * Removes a listener for budget changes.
+     *
+     * @param listener the listener to remove
      */
     public void removeBudgetChangeListener(BudgetChangeListener listener) {
         listeners.remove(listener);
     }
 
     /**
-     * Notify all listeners that budget data has changed
+     * Notifies all registered listeners that the budget data has changed.
      */
     private void notifyBudgetDataChanged() {
         for (BudgetChangeListener listener : new ArrayList<>(listeners)) {
@@ -67,7 +90,9 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
         }
     }
 
-    // Load budget data from storage
+    /**
+     * Loads budget data from storage.
+     */
     private void loadBudgetData() {
         List<Object[]> budgets = UserBudgetStorage.loadBudgets();
         Map<String, Double> newBudgets = new HashMap<>();
@@ -79,7 +104,9 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
         this.categoryBudgets = newBudgets;
     }
 
-    // Load transaction data and calculate expenses by category
+    /**
+     * Loads transaction data and calculates expenses by category.
+     */
     private void loadTransactionData() {
         List<Object[]> transactions = UserBillStorage.loadTransactions();
         Map<String, Double> expenses = new HashMap<>();
@@ -94,7 +121,12 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
         this.categoryExpenses = expenses;
     }
 
-    // Implement DataRefreshListener method
+    /**
+     * Handles data refresh events from the DataRefreshManager.
+     * Reloads data and notifies listeners if relevant data has changed.
+     *
+     * @param type the type of data refresh event
+     */
     @Override
     public void onDataRefresh(DataRefreshManager.RefreshType type) {
         if (type == DataRefreshManager.RefreshType.TRANSACTIONS ||
@@ -113,27 +145,50 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
         }
     }
 
-    // Getters for the view
+    /**
+     * Gets the overall budget usage percentage.
+     *
+     * @return the percentage of total expenses over total budget, or 0 if no budget
+     */
     public double getOverallBudgetPercentage() {
         double totalBudget = categoryBudgets.values().stream().mapToDouble(Double::doubleValue).sum();
         double totalExpense = categoryExpenses.values().stream().mapToDouble(Double::doubleValue).sum();
         return totalBudget > 0 ? (totalExpense / totalBudget) * 100 : 0;
     }
 
+    /**
+     * Gets the map of category budgets.
+     *
+     * @return a copy of the category budgets map
+     */
     public Map<String, Double> getCategoryBudgets() {
         return new HashMap<>(categoryBudgets);
     }
 
+    /**
+     * Gets the map of category expenses.
+     *
+     * @return a copy of the category expenses map
+     */
     public Map<String, Double> getCategoryExpenses() {
         return new HashMap<>(categoryExpenses);
     }
 
+    /**
+     * Gets the budget for a specific category.
+     *
+     * @param category the category name
+     * @return the budget amount for the category, or 0 if not set
+     */
     public double getCategoryBudget(String category) {
         return categoryBudgets.getOrDefault(category, 0.0);
     }
 
     /**
-     * Update a category budget
+     * Updates the budget for a specific category and saves to storage.
+     *
+     * @param category the category name
+     * @param budget the new budget amount
      */
     public void updateCategoryBudget(String category, double budget) {
         categoryBudgets.put(category, budget);
@@ -142,7 +197,10 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Delete a category budget
+     * Deletes the budget for a specific category and saves to storage.
+     *
+     * @param category the category name
+     * @return true if the category existed and was deleted, false otherwise
      */
     public boolean deleteCategoryBudget(String category) {
         if (!categoryBudgets.containsKey(category)) {
@@ -154,6 +212,9 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
         return true;
     }
 
+    /**
+     * Saves the current category budgets to storage.
+     */
     private void saveBudgetsToStorage() {
         List<Object[]> budgets = new ArrayList<>();
         for (Map.Entry<String, Double> entry : categoryBudgets.entrySet()) {
@@ -163,7 +224,8 @@ public class DashboardBudgetsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Clean up when no longer needed
+     * Cleans up listeners and unregisters from the DataRefreshManager.
+     * Should be called when this ViewModel is no longer needed.
      */
     public void cleanup() {
         DataRefreshManager.getInstance().removeListener(this);

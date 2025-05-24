@@ -6,35 +6,48 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Storage handler for user settings
- * This class manages the physical storage of settings in the user_data package
+ * Storage handler for user settings.
+ * This class manages the physical storage of user settings in the user_data package.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>Loads and saves settings to a user-specific properties file</li>
+ *   <li>Initializes storage with default settings if needed</li>
+ *   <li>Provides methods to get and set the current username and file path</li>
+ * </ul>
+ 
  */
 public class UserSettingsStorage {
+    /** Private constructor to prevent instantiation */
+    private UserSettingsStorage() {
+        // Prevent instantiation
+    }
     private static final Logger LOGGER = Logger.getLogger(UserSettingsStorage.class.getName());
     private static final String SETTINGS_FILENAME = "user_settings.properties";
     private static File settingsFile;
-    private static String username; // 添加用户名字段
-    
+    private static String username;
+
     /**
-     * 设置当前用户名，并更新文件路径
-     * @param username 当前用户的用户名
+     * Sets the current username and updates the file path.
+     * @param username The current user's username
      */
     public static void setUsername(String username) {
         UserSettingsStorage.username = username;
-        // 更新文件路径为用户特定路径
+        // Update file path to user-specific path
         String packagePath = ".\\user_data\\" + username;
         settingsFile = new File(packagePath, SETTINGS_FILENAME);
-        
-        // 确保文件存在
+
+        // Ensure file exists
         initializeStorage();
     }
-    
+
     /**
-     * Initialize the storage directory and file
+     * Initializes the storage directory and file.
+     * Creates the directory and file if they do not exist, and writes default settings if needed.
      */
     private static void initializeStorage() {
         File directory = settingsFile.getParentFile();
-        
+
         // Create directory if it doesn't exist
         if (!directory.exists()) {
             if (directory.mkdirs()) {
@@ -44,31 +57,31 @@ public class UserSettingsStorage {
                 return;
             }
         }
-        
+
         // Create default settings file if it doesn't exist
         if (!settingsFile.exists()) {
             try {
                 if (settingsFile.createNewFile()) {
                     // Create default settings content
                     Properties defaultProperties = new Properties();
-                    
+
                     // Default profile settings
                     defaultProperties.setProperty("user.name", username != null ? username : "");
                     defaultProperties.setProperty("user.email", "");
                     defaultProperties.setProperty("user.phone", "");
-                    
+
                     // Default preferences
                     defaultProperties.setProperty("currency.code", "USD");
                     defaultProperties.setProperty("currency.symbol", "$");
                     defaultProperties.setProperty("theme.dark", "false");
-                    
+
                     // Default notifications
                     defaultProperties.setProperty("notifications.budget.enabled", "true");
                     defaultProperties.setProperty("notifications.transaction.enabled", "true");
-                    
+
                     // Default security
                     defaultProperties.setProperty("security.password.hash", "");
-                    
+
                     // Save default properties to file
                     try (FileOutputStream fos = new FileOutputStream(settingsFile)) {
                         defaultProperties.store(fos, "Default Financial App User Settings");
@@ -84,28 +97,28 @@ public class UserSettingsStorage {
             LOGGER.log(Level.INFO, "Settings file already exists at: {0}", settingsFile.getAbsolutePath());
         }
     }
-    
+
     /**
-     * Get the path to the settings file
+     * Gets the path to the settings file.
      * @return Path to the settings file
      */
     public static String getSettingsFilePath() {
         return settingsFile.getAbsolutePath();
     }
-    
+
     /**
-     * Load settings from the file
+     * Loads settings from the file.
      * @return Properties object with loaded settings or null if loading failed
      */
     public static Properties loadSettings() {
         Properties properties = new Properties();
-        
-        // 确认文件存在
+
+        // Confirm file exists
         if (!settingsFile.exists()) {
             LOGGER.log(Level.WARNING, "Settings file does not exist: {0}", settingsFile.getAbsolutePath());
             return null;
         }
-        
+
         try (FileInputStream fis = new FileInputStream(settingsFile)) {
             properties.load(fis);
             LOGGER.log(Level.INFO, "Successfully loaded settings from: {0}", settingsFile.getAbsolutePath());
@@ -116,9 +129,9 @@ public class UserSettingsStorage {
             return null;
         }
     }
-    
+
     /**
-     * Save settings to the file
+     * Saves settings to the file.
      * @param properties Properties object with settings to save
      * @return true if successful, false otherwise
      */

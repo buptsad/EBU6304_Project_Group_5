@@ -37,6 +37,8 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'com.jayway.jsonpath:json-path:2.9.0'
     testImplementation 'org.mockito:mockito-core:4.2.0'
+    testImplementation 'org.mockito:mockito-inline:4.2.0'
+    testImplementation 'org.assertj:assertj-swing-junit:3.17.1'
 }
 
 application {
@@ -45,6 +47,8 @@ application {
 
 test {
     useJUnitPlatform()
+    jvmArgs += ["-Djdk.attach.allowAttachSelf=true"]
+    // systemProperty 'java.awt.headless', 'true'
 }
 
 tasks.named('jar') {
@@ -58,3 +62,11 @@ tasks.named('jar') {
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+
+// ...existing code...
+
+/* javadoc {
+    source = files('src/main/java/com/example/app/model/DataRefreshListener.java')
+    include 'com/example/app/model/DataRefreshListener.java'
+}   */

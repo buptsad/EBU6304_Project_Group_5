@@ -11,8 +11,17 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 /**
- * ViewModel for IncomeExpensesChartPanel following MVVM pattern.
- * Acts as an intermediary between the chart panel and finance data model.
+ * ViewModel for IncomeExpensesChartPanel following the MVVM pattern.
+ * Acts as an intermediary between the chart panel and the finance data model.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>Provides daily income and expense data for chart visualization</li>
+ *   <li>Listens for data refresh events and notifies chart listeners</li>
+ *   <li>Supports registration and removal of chart data change listeners</li>
+ *   <li>Handles cleanup of listeners when no longer needed</li>
+ * </ul>
+ 
  */
 public class IncomeExpensesChartViewModel implements DataRefreshListener {
     private static final Logger LOGGER = Logger.getLogger(IncomeExpensesChartViewModel.class.getName());
@@ -20,21 +29,31 @@ public class IncomeExpensesChartViewModel implements DataRefreshListener {
     private final List<ChartDataChangeListener> listeners = new ArrayList<>();
 
     /**
-     * Interface for components that need to be notified of chart data changes
+     * Listener interface for components that need to be notified of chart data changes.
      */
     public interface ChartDataChangeListener {
+        /**
+         * Called when the chart data has changed and the chart should be refreshed.
+         */
         void onChartDataChanged();
     }
 
+    /**
+     * Constructs an IncomeExpensesChartViewModel with the given FinanceData.
+     * Registers for data refresh events.
+     *
+     * @param financeData the finance data model
+     */
     public IncomeExpensesChartViewModel(FinanceData financeData) {
         this.financeData = financeData;
-        
         // Register for data refresh events
         DataRefreshManager.getInstance().addListener(this);
     }
 
     /**
-     * Add a listener for chart data changes
+     * Adds a listener for chart data changes.
+     *
+     * @param listener the listener to add
      */
     public void addChangeListener(ChartDataChangeListener listener) {
         if (!listeners.contains(listener)) {
@@ -43,14 +62,16 @@ public class IncomeExpensesChartViewModel implements DataRefreshListener {
     }
 
     /**
-     * Remove a listener
+     * Removes a chart data change listener.
+     *
+     * @param listener the listener to remove
      */
     public void removeChangeListener(ChartDataChangeListener listener) {
         listeners.remove(listener);
     }
 
     /**
-     * Notify all listeners that chart data has changed
+     * Notifies all registered listeners that the chart data has changed.
      */
     private void notifyChartDataChanged() {
         for (ChartDataChangeListener listener : new ArrayList<>(listeners)) {
@@ -59,7 +80,7 @@ public class IncomeExpensesChartViewModel implements DataRefreshListener {
     }
 
     /**
-     * Get all dates for the chart
+     * Gets all dates for the chart.
      * @return List of dates in chronological order
      */
     public List<LocalDate> getDates() {
@@ -67,7 +88,7 @@ public class IncomeExpensesChartViewModel implements DataRefreshListener {
     }
 
     /**
-     * Get daily income data
+     * Gets daily income data.
      * @return Map of dates to income amounts
      */
     public Map<LocalDate, Double> getDailyIncomes() {
@@ -75,17 +96,22 @@ public class IncomeExpensesChartViewModel implements DataRefreshListener {
     }
 
     /**
-     * Get daily expense data
+     * Gets daily expense data.
      * @return Map of dates to expense amounts
      */
     public Map<LocalDate, Double> getDailyExpenses() {
         return financeData.getDailyExpenses();
     }
 
-    // Implement DataRefreshListener method
+    /**
+     * Called when data is refreshed in the data model.
+     * Notifies listeners if relevant data has changed.
+     *
+     * @param type the type of data refresh event
+     */
     @Override
     public void onDataRefresh(DataRefreshManager.RefreshType type) {
-        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS ||
             type == DataRefreshManager.RefreshType.ALL) {
             // Notify listeners about data change
             notifyChartDataChanged();
@@ -93,7 +119,8 @@ public class IncomeExpensesChartViewModel implements DataRefreshListener {
     }
 
     /**
-     * Clean up when no longer needed
+     * Cleans up listeners and unregisters from the DataRefreshManager.
+     * Should be called when this ViewModel is no longer needed.
      */
     public void cleanup() {
         DataRefreshManager.getInstance().removeListener(this);

@@ -12,8 +12,18 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
- * ViewModel for DashboardTransactionsPanel following MVVM pattern.
+ * ViewModel for DashboardTransactionsPanel following the MVVM pattern.
  * Acts as an intermediary between the DashboardTransactionsPanel (View) and the storage classes.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>Loads and manages recent transactions from user storage</li>
+ *   <li>Provides recent transaction data for the view</li>
+ *   <li>Listens for data refresh events and notifies listeners</li>
+ *   <li>Supports registration and removal of transaction change listeners</li>
+ *   <li>Handles cleanup of listeners when no longer needed</li>
+ * </ul>
+ 
  */
 public class DashboardTransactionsViewModel implements DataRefreshListener {
     private static final Logger LOGGER = Logger.getLogger(DashboardTransactionsViewModel.class.getName());
@@ -24,14 +34,17 @@ public class DashboardTransactionsViewModel implements DataRefreshListener {
     private List<TransactionEntry> recentTransactions = new ArrayList<>();
 
     /**
-     * Interface for components that need to be notified of transaction data changes
+     * Listener interface for components that need to be notified of transaction data changes.
      */
     public interface TransactionChangeListener {
+        /**
+         * Called when the transaction data has changed and the view should be refreshed.
+         */
         void onTransactionsChanged();
     }
 
     /**
-     * Data class to represent a transaction entry for display
+     * Data class to represent a transaction entry for display.
      */
     public static class TransactionEntry {
         private final LocalDate date;
@@ -39,6 +52,14 @@ public class DashboardTransactionsViewModel implements DataRefreshListener {
         private final String category;
         private final double amount;
 
+        /**
+         * Constructs a TransactionEntry.
+         *
+         * @param date        the transaction date
+         * @param description the transaction description
+         * @param category    the transaction category
+         * @param amount      the transaction amount
+         */
         public TransactionEntry(LocalDate date, String description, String category, double amount) {
             this.date = date;
             this.description = description;
@@ -46,12 +67,41 @@ public class DashboardTransactionsViewModel implements DataRefreshListener {
             this.amount = amount;
         }
 
+        /**
+         * Gets the transaction date.
+         *
+         * @return the transaction date
+         */
         public LocalDate getDate() { return date; }
+
+        /**
+         * Gets the transaction description.
+         *
+         * @return the transaction description
+         */
         public String getDescription() { return description; }
+
+        /**
+         * Gets the transaction category.
+         *
+         * @return the transaction category
+         */
         public String getCategory() { return category; }
+
+        /**
+         * Gets the transaction amount.
+         *
+         * @return the transaction amount
+         */
         public double getAmount() { return amount; }
     }
 
+    /**
+     * Constructs a DashboardTransactionsViewModel for the specified user.
+     * Initializes storage and loads initial data.
+     *
+     * @param username the username for which to manage transactions
+     */
     public DashboardTransactionsViewModel(String username) {
         this.username = username;
         UserBillStorage.setUsername(username);
@@ -64,7 +114,9 @@ public class DashboardTransactionsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Add a listener for transaction data changes
+     * Adds a listener for transaction data changes.
+     *
+     * @param listener the listener to add
      */
     public void addChangeListener(TransactionChangeListener listener) {
         if (!listeners.contains(listener)) {
@@ -73,14 +125,16 @@ public class DashboardTransactionsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Remove a listener
+     * Removes a listener for transaction data changes.
+     *
+     * @param listener the listener to remove
      */
     public void removeChangeListener(TransactionChangeListener listener) {
         listeners.remove(listener);
     }
 
     /**
-     * Notify all listeners that transaction data has changed
+     * Notifies all registered listeners that the transaction data has changed.
      */
     private void notifyTransactionsChanged() {
         for (TransactionChangeListener listener : new ArrayList<>(listeners)) {
@@ -89,7 +143,7 @@ public class DashboardTransactionsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Load transaction data from UserBillStorage
+     * Loads transaction data from UserBillStorage.
      */
     private void loadTransactionData() {
         List<Object[]> transactions = UserBillStorage.loadTransactions();
@@ -119,14 +173,20 @@ public class DashboardTransactionsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Get recent transactions for display
+     * Gets recent transactions for display.
+     *
      * @return List of recent transaction entries, sorted by date (newest first)
      */
     public List<TransactionEntry> getRecentTransactions() {
         return new ArrayList<>(recentTransactions);
     }
 
-    // Implement DataRefreshListener method
+    /**
+     * Handles data refresh events from the DataRefreshManager.
+     * Reloads data and notifies listeners if relevant data has changed.
+     *
+     * @param type the type of data refresh event
+     */
     @Override
     public void onDataRefresh(DataRefreshManager.RefreshType type) {
         if (type == DataRefreshManager.RefreshType.TRANSACTIONS ||
@@ -139,7 +199,8 @@ public class DashboardTransactionsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Clean up when no longer needed
+     * Cleans up listeners and unregisters from the DataRefreshManager.
+     * Should be called when this ViewModel is no longer needed.
      */
     public void cleanup() {
         DataRefreshManager.getInstance().removeListener(this);

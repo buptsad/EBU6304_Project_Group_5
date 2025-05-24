@@ -11,8 +11,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * ViewModel for DashboardReportsPanel following MVVM pattern.
+ * ViewModel for DashboardReportsPanel following the MVVM pattern.
  * Coordinates report data and manages child chart ViewModels.
+ * <p>
+ * Features:
+ * <ul>
+ *   <li>Loads and manages report data for the dashboard</li>
+ *   <li>Notifies listeners when report data changes</li>
+ *   <li>Handles data refresh events and reloads data as needed</li>
+ *   <li>Provides access to the FinanceData model for charts</li>
+ * </ul>
+ 
  */
 public class DashboardReportsViewModel implements DataRefreshListener {
     private static final Logger LOGGER = Logger.getLogger(DashboardReportsViewModel.class.getName());
@@ -21,29 +30,40 @@ public class DashboardReportsViewModel implements DataRefreshListener {
     private final List<ReportDataChangeListener> listeners = new ArrayList<>();
 
     /**
-     * Interface for components that need to be notified of report data changes
+     * Listener interface for components that need to be notified of report data changes.
      */
     public interface ReportDataChangeListener {
+        /**
+         * Called when the report data has changed and the view should be refreshed.
+         */
         void onReportDataChanged();
     }
 
+    /**
+     * Constructs a DashboardReportsViewModel for the specified user.
+     * Initializes the FinanceData model and loads initial data.
+     *
+     * @param username the username for which to manage reports
+     */
     public DashboardReportsViewModel(String username) {
         this.username = username;
         this.financeData = new FinanceData();
-        
-        // Set data directory for loading budgets
+
+        // Set data directory for loading budgets and transactions
         String dataDirectory = ".\\user_data\\" + username;
         financeData.setDataDirectory(dataDirectory);
-        
+
         // Register for data refresh events
         DataRefreshManager.getInstance().addListener(this);
-        
+
         // Load initial data
         loadTransactionData();
     }
 
     /**
-     * Add a listener for report data changes
+     * Adds a listener for report data changes.
+     *
+     * @param listener the listener to add
      */
     public void addChangeListener(ReportDataChangeListener listener) {
         if (!listeners.contains(listener)) {
@@ -52,14 +72,16 @@ public class DashboardReportsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Remove a listener
+     * Removes a listener for report data changes.
+     *
+     * @param listener the listener to remove
      */
     public void removeChangeListener(ReportDataChangeListener listener) {
         listeners.remove(listener);
     }
 
     /**
-     * Notify all listeners that report data has changed
+     * Notifies all registered listeners that the report data has changed.
      */
     private void notifyReportDataChanged() {
         for (ReportDataChangeListener listener : new ArrayList<>(listeners)) {
@@ -68,12 +90,12 @@ public class DashboardReportsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Load transaction data from user's CSV file
+     * Loads transaction data from the user's CSV file and imports it into the FinanceData model.
      */
     private void loadTransactionData() {
         String csvFilePath = ".\\user_data\\" + username + "\\user_bill.csv";
         List<Object[]> transactions = CSVDataImporter.importTransactionsFromCSV(csvFilePath);
-        
+
         if (!transactions.isEmpty()) {
             financeData.importTransactions(transactions);
             LOGGER.log(Level.INFO, "Successfully loaded {0} transactions", transactions.size());
@@ -83,32 +105,40 @@ public class DashboardReportsViewModel implements DataRefreshListener {
     }
 
     /**
-     * Get the finance data model for charts
+     * Gets the FinanceData model for use in charts and reports.
+     *
+     * @return the FinanceData instance
      */
     public FinanceData getFinanceData() {
         return financeData;
     }
 
-    // Implement DataRefreshListener method
+    /**
+     * Handles data refresh events from the DataRefreshManager.
+     * Reloads data and notifies listeners if relevant data has changed.
+     *
+     * @param type the type of data refresh event
+     */
     @Override
     public void onDataRefresh(DataRefreshManager.RefreshType type) {
-        if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
-            type == DataRefreshManager.RefreshType.BUDGETS || 
+        if (type == DataRefreshManager.RefreshType.TRANSACTIONS ||
+            type == DataRefreshManager.RefreshType.BUDGETS ||
             type == DataRefreshManager.RefreshType.ALL) {
-            
+
             // Reload transaction data if needed
-            if (type == DataRefreshManager.RefreshType.TRANSACTIONS || 
+            if (type == DataRefreshManager.RefreshType.TRANSACTIONS ||
                 type == DataRefreshManager.RefreshType.ALL) {
                 loadTransactionData();
             }
-            
+
             // Notify listeners about data change
             notifyReportDataChanged();
         }
     }
 
     /**
-     * Clean up when no longer needed
+     * Cleans up listeners and unregisters from the DataRefreshManager.
+     * Should be called when this ViewModel is no longer needed.
      */
     public void cleanup() {
         DataRefreshManager.getInstance().removeListener(this);
